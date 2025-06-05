@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Random Video Chat</title>
+  <style>
+    video {
+      width: 45%;
+      margin: 10px;
+      border: 2px solid #ccc;
+      border-radius: 10px;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+    }
+  </style>
+</head>
+<body>
+  <h2>Random Video Chat</h2>
+  <video id="localVideo" autoplay muted></video>
+  <video id="remoteVideo" autoplay></video>
+
+  <script>
+    const clientId = crypto.randomUUID();
+    const localVideo = document.getElementById("localVideo");
+    const remoteVideo = document.getElementById("remoteVideo");
+
+    const peerConnection = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
+
+    const ws = new WebSocket("ws://localhost:8080/ws");
+
+    ws.onmessage = async (message) => {
+      const data = JSON.parse(message.data);
+
+      if (data.from === clientId) return; // ignore own messages
+
+      if (data.type === 'ready') {
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        ws.send(JSON.stringify({ type: 'offer', offer, from: clientId }));
+      }
+
+      if (data.type === 'offer') {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        ws.send(JSON.stringify({ type: 'answer', answer, from: clientId }));
+      }
+
+      if (data.type === 'answer') {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+      }
+
+      if (data.type === 'ice') {
+        try {
+          await peerConnection.addIceCandidate(data.candidate);
+        } catch (e) {
+          console.error("ICE error:", e);
+        }
+      }
+
+      if (data.type === 'leave') {
+        remoteVideo.srcObject = null;
+        peerConnection.close();
+        alert("Peer disconnected");
+      }
+    };
+
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        ws.send(JSON.stringify({ type: 'ice', candidate: event.candidate, from: clientId }));
+      }
+    };
+
+    peerConnection.ontrack = (event) => {
+      remoteVideo.srcObject = event.streams[0];
+    };
+
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then((stream) => {
+        localVideo.srcObject = stream;
+        stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+      })
+      .catch((err) => {
+        console.error("Media access error:", err);
+      });
+  </script>
+</body>
+</html>
