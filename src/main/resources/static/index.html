@@ -17,79 +17,285 @@
       height: 100vh;
       flex-direction: column;
     }
+    #status {
+      margin-top: 10px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
   <h2>Random Video Chat</h2>
-  <video id="localVideo" autoplay muted></video>
-  <video id="remoteVideo" autoplay></video>
+  <div id="status">Connecting to server...</div>
+  <div>
+    <video id="localVideo" autoplay muted playsinline></video> <!-- Added playsinline for mobile compatibility -->
+    <video id="remoteVideo" autoplay playsinline></video> <!-- Added playsinline -->
+  </div>
 
   <script>
-    const clientId = crypto.randomUUID();
     const localVideo = document.getElementById("localVideo");
     const remoteVideo = document.getElementById("remoteVideo");
+    const statusDiv = document.getElementById("status");
+    let peerConnection;
+    let localStream;
+    let remoteIceCandidatesQueue = []; // Queue for early ICE candidates
 
-    const peerConnection = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-    });
+    // --- WebSocket Setup ---
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    // For local development, use "localhost:8080". For Render, window.location.host is fine.
+    const wsHost = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+                   ? "localhost:8080"
+                   : window.location.host;
+    const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
 
-    const ws = new WebSocket("ws://localhost:8080/ws");
+    console.log(`Attempting to connect to WebSocket at: ${ws.url}`);
+
+    ws.onopen = () => {
+      console.log("WebSocket connection established.");
+      statusDiv.textContent = "Connected to server. Waiting for a peer...";
+    };
 
     ws.onmessage = async (message) => {
+      console.log("WebSocket message received:", message.data);
       const data = JSON.parse(message.data);
 
-      if (data.from === clientId) return; // ignore own messages
+      switch (data.type) {
+        case 'initiateOffer':
+          statusDiv.textContent = "Peer found! Initiating call...";
+          console.log("Received initiateOffer. Creating offer...");
+          await createPeerConnection();
+          if (!localStream) {
+            console.warn("Local stream not ready when initiating offer, waiting for it.");
+            await startMedia(); // Ensure media is started
+          }
+          // Ensure local tracks are added before creating offer
+          if (localStream && peerConnection.getSenders().length === 0) {
+              localStream.getTracks().forEach(track => {
+                  console.log("Adding local track to PeerConnection before offer:", track.kind);
+                  peerConnection.addTrack(track, localStream);
+              });
+          }
+          const offer = await peerConnection.createOffer();
+          await peerConnection.setLocalDescription(offer);
+          ws.send(JSON.stringify({ type: 'offer', offer: offer }));
+          console.log("Sent offer:", offer);
+          break;
 
-      if (data.type === 'ready') {
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        ws.send(JSON.stringify({ type: 'offer', offer, from: clientId }));
+        case 'waitForOffer':
+          statusDiv.textContent = "Peer found! Waiting for them to call...";
+          console.log("Received waitForOffer. Awaiting offer from peer...");
+          await createPeerConnection();
+          if (!localStream) {
+            console.warn("Local stream not ready when waiting for offer, starting it.");
+            await startMedia(); // Ensure media is started
+          }
+           // Ensure local tracks are added for the answerer too
+          if (localStream && peerConnection.getSenders().length === 0) {
+              localStream.getTracks().forEach(track => {
+                  console.log("Adding local track to PeerConnection while waiting for offer:", track.kind);
+                  peerConnection.addTrack(track, localStream);
+              });
+          }
+          break;
+
+        case 'offer':
+          console.log("Received offer:", data.offer);
+          if (!peerConnection) await createPeerConnection();
+          try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+            console.log("Set remote description from offer.");
+            await processQueuedIceCandidates(); // Process any queued ICE candidates
+
+            // Ensure local stream is ready and tracks are added before creating answer
+            if (!localStream) {
+                console.warn("Local stream not ready when creating answer, waiting for it.");
+                await startMedia();
+            }
+            if (localStream && peerConnection.getSenders().length === 0) { // Add tracks if not already added
+                localStream.getTracks().forEach(track => {
+                    console.log("Adding local track to PeerConnection before answer:", track.kind);
+                    peerConnection.addTrack(track, localStream);
+                });
+            }
+
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            ws.send(JSON.stringify({ type: 'answer', answer: answer }));
+            console.log("Sent answer:", answer);
+            // Status "Call connected!" might be premature, better to wait for ICE connected or track event
+          } catch (error) {
+            console.error("Error processing offer:", error);
+            statusDiv.textContent = "Error processing offer.";
+          }
+          break;
+
+        case 'answer':
+          console.log("Received answer:", data.answer);
+          try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+            console.log("Set remote description from answer.");
+            await processQueuedIceCandidates(); // Process any queued ICE candidates
+            // Status "Call connected!" might be premature, better to wait for ICE connected or track event
+          } catch (error) {
+            console.error("Error processing answer:", error);
+            statusDiv.textContent = "Error processing answer.";
+          }
+          break;
+
+        case 'ice':
+          console.log("Received ICE candidate:", data.candidate);
+          if (data.candidate) {
+            try {
+              if (peerConnection && peerConnection.remoteDescription) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                console.log("Added ICE candidate immediately.");
+              } else {
+                remoteIceCandidatesQueue.push(data.candidate);
+                console.log("Queued ICE candidate because remoteDescription is not yet set.");
+              }
+            } catch (e) {
+              console.error("Error adding received ICE candidate:", e);
+            }
+          }
+          break;
+
+        case 'leave':
+          console.log("Peer disconnected.");
+          statusDiv.textContent = "Peer disconnected. Waiting for a new peer...";
+          alert("Peer has disconnected.");
+          resetConnection();
+          break;
+
+        default:
+          console.warn("Unknown message type received:", data.type);
       }
+    };
 
-      if (data.type === 'offer') {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        ws.send(JSON.stringify({ type: 'answer', answer, from: clientId }));
+    ws.onclose = (event) => {
+      console.log("WebSocket connection closed:", event.reason, "Code:", event.code);
+      statusDiv.textContent = "Disconnected from server. Please refresh.";
+      resetConnection();
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      statusDiv.textContent = "Error connecting to server. Check console.";
+    };
+
+    async function createPeerConnection() {
+      console.log("Creating RTCPeerConnection...");
+      if (peerConnection) {
+        console.log("PeerConnection already exists, closing old one.");
+        peerConnection.close();
       }
+      remoteIceCandidatesQueue = []; // Reset queue for new connection
+      peerConnection = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
 
-      if (data.type === 'answer') {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-      }
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          console.log("Generated ICE candidate:", event.candidate);
+          ws.send(JSON.stringify({ type: 'ice', candidate: event.candidate }));
+        } else {
+          console.log("All local ICE candidates have been sent.");
+        }
+      };
 
-      if (data.type === 'ice') {
-        try {
-          await peerConnection.addIceCandidate(data.candidate);
-        } catch (e) {
-          console.error("ICE error:", e);
+      peerConnection.oniceconnectionstatechange = () => {
+        console.log("ICE connection state change:", peerConnection.iceConnectionState);
+        statusDiv.textContent = `ICE Status: ${peerConnection.iceConnectionState}`;
+        if (peerConnection.iceConnectionState === 'connected' || peerConnection.iceConnectionState === 'completed') {
+            statusDiv.textContent = "Call connected!";
+        } else if (peerConnection.iceConnectionState === 'failed' ||
+                   peerConnection.iceConnectionState === 'disconnected' ||
+                   peerConnection.iceConnectionState === 'closed') {
+            // statusDiv.textContent = `Call disconnected (${peerConnection.iceConnectionState}).`;
+            // Consider resetConnection() here if it's a persistent failure
+        }
+      };
+
+      peerConnection.ontrack = (event) => {
+        console.log("Track received from remote peer:", event.streams[0]);
+        if (remoteVideo.srcObject !== event.streams[0]) {
+          remoteVideo.srcObject = event.streams[0];
+          console.log("Remote video stream set.");
+          statusDiv.textContent = "Call connected!"; // Good place to confirm connection
+        }
+      };
+
+      // Tracks will be added once localStream is available via startMedia()
+      // and when offer/answer logic dictates.
+    }
+
+    async function processQueuedIceCandidates() {
+      while (remoteIceCandidatesQueue.length > 0) {
+        const candidate = remoteIceCandidatesQueue.shift();
+        if (peerConnection && peerConnection.remoteDescription) { // Double check, should be true here
+            console.log("Processing queued ICE candidate:", candidate);
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                console.log("Added queued ICE candidate.");
+            } catch (e) {
+                console.error("Error adding queued ICE candidate:", e);
+            }
+        } else {
+            console.warn("Skipping queued ICE candidate as remoteDescription is still not set (should not happen here).");
+            // remoteIceCandidatesQueue.unshift(candidate); // Optionally re-queue, but indicates a deeper logic issue
+            // break;
         }
       }
+    }
 
-      if (data.type === 'leave') {
-        remoteVideo.srcObject = null;
+    function resetConnection() {
+      console.log("Resetting connection.");
+      if (peerConnection) {
         peerConnection.close();
-        alert("Peer disconnected");
+        peerConnection = null;
       }
-    };
+      remoteVideo.srcObject = null;
+      remoteIceCandidatesQueue = []; // Clear queue
+      // Don't stop localStream here, let it continue for potential new connections
+      statusDiv.textContent = "Ready for new connection..."; // Or similar
+    }
 
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        ws.send(JSON.stringify({ type: 'ice', candidate: event.candidate, from: clientId }));
+    async function startMedia() {
+      if (localStream) { // Avoid re-requesting if already have stream
+        console.log("Local media stream already exists.");
+        return;
       }
-    };
+      try {
+        console.log("Requesting user media (video and audio)...");
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localVideo.srcObject = localStream;
+        console.log("Local media stream obtained.");
 
-    peerConnection.ontrack = (event) => {
-      remoteVideo.srcObject = event.streams[0];
-    };
+        // If peerConnection exists and has no senders, add tracks now.
+        // This is crucial if createPeerConnection was called before media was ready.
+        if (peerConnection && peerConnection.getSenders().length === 0) {
+            console.log("PeerConnection exists, adding tracks from newly acquired localStream.");
+            localStream.getTracks().forEach(track => {
+                console.log("Adding local track to existing PeerConnection (after media start):", track.kind);
+                peerConnection.addTrack(track, localStream);
+            });
+        }
+      } catch (err) {
+        console.error("Error accessing media devices:", err);
+        statusDiv.textContent = "Error accessing media: " + err.message;
+        alert("Could not access camera/microphone: " + err.message);
+        throw err; // Re-throw to stop dependent operations if media fails
+      }
+    }
 
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      .then((stream) => {
-        localVideo.srcObject = stream;
-        stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
-      })
-      .catch((err) => {
-        console.error("Media access error:", err);
-      });
+    // Initialize
+    async function initialize() {
+        await createPeerConnection(); // Create PC early, but don't add tracks yet
+        await startMedia(); // Get media, this will also try to add tracks if PC exists
+        // WebSocket connection is already initiated above.
+        // The signaling flow will handle adding tracks before offer/answer creation specifically.
+    }
+
+    initialize().catch(e => console.error("Initialization failed:", e));
+
   </script>
 </body>
 </html>
