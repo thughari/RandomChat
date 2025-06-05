@@ -5,7 +5,9 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +19,8 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import jakarta.annotation.PreDestroy;
+
 @Component
 public class SignalingHandler extends TextWebSocketHandler {
     private static final Logger logger = LoggerFactory.getLogger(SignalingHandler.class);
@@ -26,7 +30,23 @@ public class SignalingHandler extends TextWebSocketHandler {
     
     @Autowired
     @Qualifier("virtualThreadTaskExecutor")
-    private Executor virtualThreadExecutor;
+    private ExecutorService virtualThreadExecutor;
+    
+    private volatile boolean isShuttingDown = false;
+    
+    @PreDestroy
+    public void shutdown() {
+        isShuttingDown = true;
+        virtualThreadExecutor.shutdown();
+        try {
+            if (!virtualThreadExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                virtualThreadExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            virtualThreadExecutor.shutdownNow();
+        }
+    }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -51,7 +71,7 @@ public class SignalingHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-        virtualThreadExecutor.execute(() -> {
+        executeIfNotShutdown(() -> {
             try {
                 String sessionId = session.getId();
                 String peerId = peerMap.get(sessionId);
@@ -69,22 +89,29 @@ public class SignalingHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        virtualThreadExecutor.execute(() -> {
+        if (!isShuttingDown) {
             try {
                 String sessionId = session.getId();
                 sessions.remove(sessionId);
-
                 synchronized (waitingUsers) {
                     waitingUsers.remove(sessionId);
                 }
-
                 handlePeerDisconnection(sessionId);
-                
                 logger.info("Total active sessions after close: {}", sessions.size());
             } catch (Exception e) {
                 logger.error("Error in connection closure", e);
             }
-        });
+        }
+    }
+    
+    private void executeIfNotShutdown(Runnable task) {
+        if (!isShuttingDown) {
+            try {
+                virtualThreadExecutor.execute(task);
+            } catch (RejectedExecutionException e) {
+                logger.warn("Task rejected, executor might be shutting down", e);
+            }
+        }
     }
 
     private void handlePairing(WebSocketSession session) {

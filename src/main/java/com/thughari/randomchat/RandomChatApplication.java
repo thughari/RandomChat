@@ -1,6 +1,6 @@
 package com.thughari.randomchat;
 
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.springframework.boot.SpringApplication;
@@ -17,7 +17,7 @@ public class RandomChatApplication {
 	}
 
 	@Bean("virtualThreadTaskExecutor")
-	public Executor virtualThreadTaskExecutor() {
+	public ExecutorService virtualThreadTaskExecutor() {
 		return Executors.newVirtualThreadPerTaskExecutor();
 	}
 }
