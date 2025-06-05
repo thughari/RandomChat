@@ -158,10 +158,33 @@
     async function ensurePeerConnection() {
       if (!peerConnection || peerConnection.signalingState === "closed") {
         console.log(`[${instanceId}] Creating new RTCPeerConnection. Previous state: ${peerConnection?.signalingState}`);
-        if(peerConnection) peerConnection.close(); // Close old one if exists and not null
+        if(peerConnection) peerConnection.close();
         remoteIceCandidatesQueue = [];
+        
+        // Fetch TURN credentials
+        const turnConfig = await fetch('/api/turn-config').then(res => res.json());
+        
         peerConnection = new RTCPeerConnection({
-          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+          iceServers: [
+            { 
+              urls: 'stun:stun.l.google.com:19302' 
+            }, 
+            {
+              urls: "turn:global.turn.twilio.com:3478?transport=udp",
+              username: turnConfig.username,
+              credential: turnConfig.credential
+            },
+            {
+              urls: "turn:global.turn.twilio.com:3478?transport=tcp",
+              username: turnConfig.username,
+              credential: turnConfig.credential
+            },
+            {
+              urls: "turn:global.turn.twilio.com:443?transport=tcp",
+              username: turnConfig.username,
+              credential: turnConfig.credential
+            }
+          ]
         });
         configurePeerConnectionEventListeners();
       } else {
