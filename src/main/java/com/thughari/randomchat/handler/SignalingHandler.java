@@ -1,14 +1,8 @@
 package com.thughari.randomchat.handler;
 
-import java.io.IOException;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
-
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,21 +13,29 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
-import jakarta.annotation.PreDestroy;
+import java.io.IOException;
+import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class SignalingHandler extends TextWebSocketHandler {
     private static final Logger logger = LoggerFactory.getLogger(SignalingHandler.class);
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
-    private final Queue<String> waitingUsers = new LinkedList<>();
+    private final Queue<String> waitingUsers = new ConcurrentLinkedQueue<>();
     private final Map<String, String> peerMap = new ConcurrentHashMap<>();
-    
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     @Autowired
     @Qualifier("virtualThreadTaskExecutor")
     private ExecutorService virtualThreadExecutor;
-    
+
     private volatile boolean isShuttingDown = false;
-    
+
     @PreDestroy
     public void shutdown() {
         isShuttingDown = true;
@@ -49,23 +51,9 @@ public class SignalingHandler extends TextWebSocketHandler {
     }
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        virtualThreadExecutor.execute(() -> {
-            try {
-                sessions.put(session.getId(), session);
-                logger.info("Connection established: {}. Total sessions: {}", session.getId(), sessions.size());
-
-                synchronized (waitingUsers) {
-                    if (waitingUsers.isEmpty()) {
-                        waitingUsers.add(session.getId());
-                        logger.info("User {} added to waiting queue", session.getId());
-                    } else {
-                        handlePairing(session);
-                    }
-                }
-            } catch (Exception e) {
-                logger.error("Error in connection establishment", e);
-            }
+    public void afterConnectionEstablished(WebSocketSession session) {
+        executeIfNotShutdown(() -> {
+            sessions.put(session.getId(), session);
         });
     }
 
@@ -73,134 +61,127 @@ public class SignalingHandler extends TextWebSocketHandler {
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
         executeIfNotShutdown(() -> {
             try {
+                Map<String, Object> messageData = objectMapper.readValue(message.getPayload(), new TypeReference<>() {});
+                String messageType = (String) messageData.get("type");
                 String sessionId = session.getId();
-                String peerId = peerMap.get(sessionId);
 
-                if (peerId != null) {
-                    handlePeerMessage(session, message, sessionId, peerId);
-                } else {
-                    logger.warn("No peer found for {}", sessionId);
+                switch (messageType) {
+                    case "ready_for_peer" -> {
+                        tryToPairUser(sessionId);
+                    }
+                    case "leave" -> {
+                        handlePeerDisconnection(sessionId);
+                    }
+                    case "offer", "answer", "ice", "media_status" -> {
+                        String peerId = peerMap.get(sessionId);
+                        if (peerId != null) {
+                            WebSocketSession peerSession = sessions.get(peerId);
+                            if (peerSession != null && peerSession.isOpen()) {
+                                sendMessage(peerSession, message.getPayload());
+                            } else {
+                                handlePeerDisconnection(sessionId);
+                            }
+                        }
+                    }
+                    default -> logger.warn("Unknown message type '{}' from session {}", messageType, sessionId);
                 }
-            } catch (Exception e) {
-                logger.error("Error handling message", e);
+            } catch (IOException e) {
+                logger.error("Error parsing message from session {}", session.getId(), e);
             }
         });
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        if (!isShuttingDown) {
-            try {
-                String sessionId = session.getId();
-                sessions.remove(sessionId);
-                synchronized (waitingUsers) {
-                    waitingUsers.remove(sessionId);
+        if (isShuttingDown) return;
+
+        String sessionId = session.getId();
+        sessions.remove(sessionId);
+        waitingUsers.remove(sessionId);
+        handlePeerDisconnection(sessionId);
+        logger.info("Total active sessions after close: {}", sessions.size());
+    }
+
+    private void tryToPairUser(String newUserId) {
+        if (peerMap.containsKey(newUserId)) {
+            return;
+        }
+
+        while (true) {
+            String waitingUserId = waitingUsers.poll();
+
+            if (waitingUserId == null) {
+                if (!waitingUsers.contains(newUserId)) {
+                    waitingUsers.add(newUserId);
+                    logger.info("Queue size: {}", waitingUsers.size());
                 }
-                handlePeerDisconnection(sessionId);
-                logger.info("Total active sessions after close: {}", sessions.size());
-            } catch (Exception e) {
-                logger.error("Error in connection closure", e);
+                break;
+            }
+
+            WebSocketSession waitingUserSession = sessions.get(waitingUserId);
+            if (waitingUserSession == null || !waitingUserSession.isOpen()) {
+                continue;
+            }
+            
+            if (waitingUserId.equals(newUserId)) {
+                if (!waitingUsers.contains(newUserId)) {
+                   waitingUsers.add(newUserId);
+                }
+                break;
+            }
+
+            WebSocketSession newUserSession = sessions.get(newUserId);
+            if (newUserSession == null || !newUserSession.isOpen()) {
+                logger.warn("New user {} disconnected before pairing.", newUserId);
+                waitingUsers.add(waitingUserId);
+                break;
+            }
+
+            peerMap.put(waitingUserId, newUserId);
+            peerMap.put(newUserId, waitingUserId);
+
+            sendMessage(waitingUserSession, "{\"type\": \"initiateOffer\"}");
+            sendMessage(newUserSession, "{\"type\": \"waitForOffer\"}");
+            break;
+        }
+    }
+
+    private void handlePeerDisconnection(String disconnectedSessionId) {
+        String peerId = peerMap.remove(disconnectedSessionId);
+        if (peerId != null) {
+            peerMap.remove(peerId);
+
+            WebSocketSession remainingPeerSession = sessions.get(peerId);
+            if (remainingPeerSession != null && remainingPeerSession.isOpen()) {
+                sendMessage(remainingPeerSession, "{\"type\": \"leave\", \"reason\": \"Your partner disconnected\"}");
             }
         }
     }
-    
+
+    private void sendMessage(WebSocketSession session, String messagePayload) {
+        if (session == null || !session.isOpen()) {
+            logger.warn("Attempted to send message to closed or null session.");
+            return;
+        }
+        executeIfNotShutdown(() -> {
+            try {
+                synchronized (session) {
+                    session.sendMessage(new TextMessage(messagePayload));
+                }
+            } catch (IOException e) {
+                logger.error("IOException sending message to session {}: {}", session.getId(), e.getMessage());
+            } catch (IllegalStateException e) {
+                logger.warn("IllegalStateException sending to session {}. It might be closing.", session.getId());
+            }
+        });
+    }
+
     private void executeIfNotShutdown(Runnable task) {
         if (!isShuttingDown) {
             try {
                 virtualThreadExecutor.execute(task);
             } catch (RejectedExecutionException e) {
-                logger.warn("Task rejected, executor might be shutting down", e);
-            }
-        }
-    }
-
-    private void handlePairing(WebSocketSession session) {
-        String peer1Id = waitingUsers.poll();
-        String peer2Id = session.getId();
-
-        WebSocketSession peer1Session = sessions.get(peer1Id);
-        if (peer1Session == null || !peer1Session.isOpen()) {
-            waitingUsers.add(peer2Id);
-            return;
-        }
-
-        peerMap.put(peer2Id, peer1Id);
-        peerMap.put(peer1Id, peer2Id);
-
-        virtualThreadExecutor.execute(() -> {
-            sendMessage(peer1Session, "{\"type\": \"initiateOffer\", \"peerId\": \"" + peer2Id + "\"}");
-            sendMessage(session, "{\"type\": \"waitForOffer\", \"peerId\": \"" + peer1Id + "\"}");
-        });
-    }
-
-    private void handlePeerMessage(WebSocketSession session, TextMessage message, String sessionId, String peerId) {
-        WebSocketSession peerSession = sessions.get(peerId);
-        if (peerSession != null && peerSession.isOpen()) {
-            virtualThreadExecutor.execute(() -> {
-                sendMessage(peerSession, message.getPayload());
-            });
-        } else {
-            handleDisconnectedPeer(session, sessionId);
-        }
-    }
-
-    private void handlePeerDisconnection(String sessionId) {
-        String peerId = peerMap.remove(sessionId);
-        if (peerId != null) {
-            peerMap.remove(peerId);
-            WebSocketSession peerSession = sessions.get(peerId);
-            if (peerSession != null && peerSession.isOpen()) {
-                virtualThreadExecutor.execute(() -> {
-                    sendMessage(peerSession, "{\"type\": \"leave\", \"reason\": \"Your partner disconnected\"}");
-                    addSessionToWaitingQueueIfNotPresent(peerId, "partner disconnected");
-                });
-            }
-        }
-    }
-
-    private void handleDisconnectedPeer(WebSocketSession session, String sessionId) {
-        virtualThreadExecutor.execute(() -> {
-            sendMessage(session, "{\"type\": \"peer_disconnected\"}");
-            peerMap.remove(sessionId);
-            addSessionToWaitingQueueIfNotPresent(sessionId, "peer was unavailable");
-        });
-    }
-
-    private void sendMessage(WebSocketSession session, String messagePayload) {
-        try {
-            if (session != null && session.isOpen()) {
-                synchronized (session) {
-                	session.sendMessage(new TextMessage(messagePayload));
-                }
-            } else {
-                logger.warn("Attempted to send message to closed or null session (ID: {})", session != null ? session.getId() : "unknown");
-            }
-        } catch (IOException e) {
-            logger.error("Error sending message to session {}: {}", session != null ? session.getId() : "unknown", e.getMessage(), e);
-            if (session != null) {
-                try {
-                    if(session.isOpen()){
-                       session.close(CloseStatus.PROTOCOL_ERROR.withReason("Failed to send message"));
-                    }
-                } catch (IOException ex) {
-                    logger.error("Error closing session {} after send failure: {}", session.getId(), ex.getMessage());
-                }
-            }
-        } catch (IllegalStateException e) {
-             logger.warn("IllegalStateException sending message to session {}: {}. Session might be closing.", session != null ? session.getId() : "unknown", e.getMessage());
-        }
-    }
-
-    private void addSessionToWaitingQueueIfNotPresent(String sessionId, String reason) {
-        synchronized (waitingUsers) {
-            if (sessions.containsKey(sessionId) && !waitingUsers.contains(sessionId) && !peerMap.containsKey(sessionId)) {
-                waitingUsers.add(sessionId);
-                logger.info("User {} added back to waiting queue (reason: {}). Waiting users: {}. Queue: {}",
-                        sessionId, reason, waitingUsers.size(), waitingUsers);
-                sendMessage(sessions.get(sessionId), "{\"type\": \"status\", \"message\": \"You are back in the waiting queue. Reason: " + reason + "\"}");
-            } else {
-                 logger.info("User {} not added back to waiting queue. Session exists: {}, In waiting: {}, In peerMap: {}",
-                        sessionId, sessions.containsKey(sessionId), waitingUsers.contains(sessionId), peerMap.containsKey(sessionId));
+                logger.warn("Task rejected, executor is shutting down.", e);
             }
         }
     }
