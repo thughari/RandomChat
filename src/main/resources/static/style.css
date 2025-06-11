@@ -1,0 +1,155 @@
+:root {
+      --bg-color: #121212;
+      --surface-color: #1e1e1e;
+      --primary-color: #03dac6;
+      --on-primary-color: #000;
+      --text-color: #e0e0e0;
+      --border-color: #333;
+      --red-color: #cf6679;
+      --red-hover-color: #e07f91;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* --- Main App Layout --- */
+    .app-container {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      max-width: 1200px;
+      height: 100%;
+      max-height: 90vh;
+      background-color: var(--surface-color);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    /* --- Video Area --- */
+    .video-container {
+      position: relative;
+      flex-grow: 1;
+      background-color: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    video {
+      transform: scaleX(-1); /* Flip local video for a mirror effect */
+      object-fit: cover;
+      border-radius: 8px;
+    }
+    #remoteVideo { width: 100%; height: 100%; border-radius: 0; }
+
+    #localVideo {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      width: 25%;
+      max-width: 250px;
+      border: 2px solid var(--border-color);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    #localVideo.hidden {
+        opacity: 0;
+        transform: scaleX(-1) scale(0.8);
+        pointer-events: none;
+    }
+
+    /* --- Status Overlays --- */
+    #status-overlay {
+      position: absolute;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.6);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 1.5rem;
+      font-weight: 500;
+      backdrop-filter: blur(5px);
+      z-index: 10;
+      transition: opacity 0.5s ease;
+      opacity: 1;
+      text-align: center;
+      padding: 1rem;
+    }
+    #status-overlay.hidden { opacity: 0; pointer-events: none; }
+    
+    #remote-status-container {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        display: flex;
+        gap: 10px;
+        z-index: 5;
+    }
+    #remote-status-container i {
+        background-color: rgba(0,0,0,0.5);
+        color: var(--red-color);
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 1.2rem;
+    }
+
+    /* --- Control Bar --- */
+    .controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+      background-color: var(--surface-color);
+      border-top: 1px solid var(--border-color);
+      gap: 1.5rem;
+    }
+
+    .control-btn {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: var(--text-color);
+      border: none;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      font-size: 1.5rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: all 0.2s ease;
+    }
+    .control-btn:hover { background-color: rgba(255, 255, 255, 0.2); }
+    .control-btn:disabled {
+        background-color: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.3);
+        cursor: not-allowed;
+    }
+    .control-btn.active { background-color: var(--primary-color); color: var(--on-primary-color); }
+    .control-btn.active:hover { filter: brightness(1.2); }
+    #disconnect-btn { background-color: var(--red-color); }
+    #disconnect-btn:hover:not(:disabled) { background-color: var(--red-hover-color); }
+    #disconnect-btn:disabled { background-color: #4d2f36; }
+
+    /* --- Responsive Design --- */
+    @media (max-width: 768px) {
+      body { height: auto; min-height: 100vh; }
+      .app-container { max-height: 100vh; height: 100vh; border-radius: 0; }
+      #localVideo { width: 30%; max-width: 120px; }
+      .controls { gap: 1rem; }
+      .control-btn { width: 50px; height: 50px; font-size: 1.25rem; }
+    }
