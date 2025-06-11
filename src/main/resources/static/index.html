@@ -18,30 +18,21 @@
   <div class="app-container" id="app-container">
     <div class="video-container" id="video-container">
       <div id="status-overlay">
-        <span id="status-text">Connecting to server...</span>
+        <span id="status-text">Searching for a partner...</span>
       </div>
       
       <div id="remote-status-container"></div>
+      <div id="notification"></div>
       
       <video id="remoteVideo" autoplay playsinline></video>
       <video id="localVideo" autoplay muted playsinline></video>
       
       <div class="controls" id="controls">
-        <button id="mic-btn" class="control-btn active" title="Mute/Unmute Mic" disabled>
-          <i class="fa-solid fa-microphone"></i>
-        </button>
-        <button id="video-btn" class="control-btn active" title="Stop/Start Video" disabled>
-          <i class="fa-solid fa-video"></i>
-        </button>
-        <button id="self-view-btn" class="control-btn active" title="Hide/Show Self View" disabled>
-          <i class="fa-solid fa-eye"></i>
-        </button>
-        <button id="fullscreen-btn" class="control-btn" title="Toggle Fullscreen">
-          <i class="fa-solid fa-expand"></i>
-        </button>
-        <button id="disconnect-btn" class="control-btn" title="Disconnect & Find New Peer" disabled>
-          <i class="fa-solid fa-phone-slash"></i>
-        </button>
+        <button id="mic-btn" class="control-btn active" title="Mute/Unmute Mic" disabled><i class="fa-solid fa-microphone"></i></button>
+        <button id="video-btn" class="control-btn active" title="Stop/Start Video" disabled><i class="fa-solid fa-video"></i></button>
+        <button id="self-view-btn" class="control-btn active" title="Hide/Show Self View" disabled><i class="fa-solid fa-eye"></i></button>
+        <button id="fullscreen-btn" class="control-btn" title="Toggle Fullscreen"><i class="fa-solid fa-expand"></i></button>
+        <button id="disconnect-btn" class="control-btn" title="Find New Partner" disabled><i class="fa-solid fa-forward"></i></button>
       </div>
     </div>
   </div>
