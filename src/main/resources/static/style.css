@@ -23,45 +23,45 @@
     }
 
     /* --- Main App Layout --- */
-    .app-container {
+    #app-container {
       display: flex;
       flex-direction: column;
       width: 100%;
-      max-width: 1200px;
       height: 100%;
-      max-height: 90vh;
-      background-color: var(--surface-color);
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      background-color: #000; /* Video container background is now the main background */
     }
 
     /* --- Video Area --- */
     .video-container {
       position: relative;
       flex-grow: 1;
-      background-color: #000;
+      width: 100%;
+      height: 100%;
       display: flex;
       justify-content: center;
       align-items: center;
+      overflow: hidden; /* Important for floating controls */
     }
 
     video {
-      transform: scaleX(-1); /* Flip local video for a mirror effect */
+      transform: scaleX(-1);
       object-fit: cover;
-      border-radius: 8px;
     }
-    #remoteVideo { width: 100%; height: 100%; border-radius: 0; }
+    #remoteVideo { width: 100%; height: 100%; }
 
     #localVideo {
       position: absolute;
-      bottom: 20px;
+      /* Adjusted to not be covered by new floating controls */
+      bottom: 100px; 
       right: 20px;
-      width: 25%;
+      width: 20vw;
       max-width: 250px;
+      min-width: 120px;
       border: 2px solid var(--border-color);
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-      transition: opacity 0.3s ease, transform 0.3s ease;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      z-index: 10;
     }
     #localVideo.hidden {
         opacity: 0;
@@ -73,16 +73,14 @@
     #status-overlay {
       position: absolute;
       inset: 0;
-      background-color: rgba(0, 0, 0, 0.6);
+      background-color: rgba(0, 0, 0, 0.7);
       display: flex;
       justify-content: center;
       align-items: center;
       font-size: 1.5rem;
-      font-weight: 500;
-      backdrop-filter: blur(5px);
-      z-index: 10;
+      backdrop-filter: blur(8px);
+      z-index: 30;
       transition: opacity 0.5s ease;
-      opacity: 1;
       text-align: center;
       padding: 1rem;
     }
@@ -94,62 +92,68 @@
         left: 20px;
         display: flex;
         gap: 10px;
-        z-index: 5;
+        z-index: 15;
     }
     #remote-status-container i {
         background-color: rgba(0,0,0,0.5);
         color: var(--red-color);
-        width: 40px;
-        height: 40px;
+        width: 40px; height: 40px;
         border-radius: 50%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        display: flex; justify-content: center; align-items: center;
         font-size: 1.2rem;
     }
 
-    /* --- Control Bar --- */
+    /* --- NEW: Floating Control Bar --- */
     .controls {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 1rem;
-      background-color: var(--surface-color);
-      border-top: 1px solid var(--border-color);
+      padding: 1rem 2rem 1.5rem 2rem;
       gap: 1.5rem;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+      z-index: 20;
+      
+      /* Hide/Show Animation */
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    
+    .controls.hidden {
+      opacity: 0;
+      transform: translateY(100%);
+      pointer-events: none;
     }
 
     .control-btn {
-      background-color: rgba(255, 255, 255, 0.1);
+      background-color: rgba(255, 255, 255, 0.15);
       color: var(--text-color);
-      border: none;
-      width: 60px;
-      height: 60px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      width: 56px; height: 56px;
       border-radius: 50%;
-      font-size: 1.5rem;
+      font-size: 1.4rem;
       cursor: pointer;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      display: flex; justify-content: center; align-items: center;
       transition: all 0.2s ease;
     }
-    .control-btn:hover { background-color: rgba(255, 255, 255, 0.2); }
+    .control-btn:hover:not(:disabled) { background-color: rgba(255, 255, 255, 0.3); }
     .control-btn:disabled {
         background-color: rgba(255, 255, 255, 0.05);
         color: rgba(255, 255, 255, 0.3);
+        border-color: rgba(255, 255, 255, 0.1);
         cursor: not-allowed;
     }
-    .control-btn.active { background-color: var(--primary-color); color: var(--on-primary-color); }
-    .control-btn.active:hover { filter: brightness(1.2); }
-    #disconnect-btn { background-color: var(--red-color); }
+    .control-btn.active { background-color: var(--primary-color); color: var(--on-primary-color); border-color: var(--primary-color);}
+    .control-btn.active:hover:not(:disabled) { filter: brightness(1.2); }
+    #disconnect-btn { background-color: var(--red-color); border-color: var(--red-color); }
     #disconnect-btn:hover:not(:disabled) { background-color: var(--red-hover-color); }
-    #disconnect-btn:disabled { background-color: #4d2f36; }
+    #disconnect-btn:disabled { background-color: #4d2f36; border-color: #4d2f36; }
 
     /* --- Responsive Design --- */
     @media (max-width: 768px) {
-      body { height: auto; min-height: 100vh; }
-      .app-container { max-height: 100vh; height: 100vh; border-radius: 0; }
-      #localVideo { width: 30%; max-width: 120px; }
-      .controls { gap: 1rem; }
-      .control-btn { width: 50px; height: 50px; font-size: 1.25rem; }
+      #localVideo { bottom: 85px; right: 15px; }
+      .controls { padding: 0.75rem 1rem 1rem 1rem; gap: 1rem; }
+      .control-btn { width: 48px; height: 48px; font-size: 1.1rem; }
     }
