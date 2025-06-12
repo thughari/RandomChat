@@ -13,7 +13,7 @@ public class KeepAlive {
 
 	private static final Logger logger = LoggerFactory.getLogger(KeepAlive.class);
 	
-	@Scheduled(fixedRate = 840_000)
+	@Scheduled(fixedRate = 300_000)
 	@Async("virtualThreadTaskExecutor")
 	public void keepAliveLog() {
 		logger.info("KeepAlive ping at {}", System.currentTimeMillis());
