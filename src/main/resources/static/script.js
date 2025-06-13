@@ -8,6 +8,11 @@
     const selfViewBtn = document.getElementById("self-view-btn"), fullscreenBtn = document.getElementById("fullscreen-btn");
     const disconnectBtn = document.getElementById("disconnect-btn");
 
+    // NEW: Confirmation Modal UI Elements
+    const confirmDisconnectModal = document.getElementById('confirm-disconnect-modal');
+    const confirmDisconnectOkBtn = document.getElementById('confirm-disconnect-ok-btn');
+    const confirmDisconnectCancelBtn = document.getElementById('confirm-disconnect-cancel-btn');
+
     // --- State & Config ---
     let peerConnection, localStream, controlsTimeout;
     let remoteIceCandidatesQueue = [];
@@ -200,6 +205,7 @@
       micBtn.innerHTML = audioTrack.enabled ? '<i class="fa-solid fa-microphone"></i>' : '<i class="fa-solid fa-microphone-slash"></i>';
       sendMediaStatus('audio', audioTrack.enabled);
     });
+
     videoBtn.addEventListener('click', () => {
       const videoTrack = localStream?.getVideoTracks()[0];
       if (!videoTrack) return;
@@ -208,6 +214,7 @@
       videoBtn.innerHTML = videoTrack.enabled ? '<i class="fa-solid fa-video"></i>' : '<i class="fa-solid fa-video-slash"></i>';
       sendMediaStatus('video', videoTrack.enabled);
     });
+    
     selfViewBtn.addEventListener('click', () => {
       localVideo.classList.toggle('hidden');
       selfViewBtn.classList.toggle('active', !localVideo.classList.contains('hidden'));
@@ -218,10 +225,17 @@
       else document.exitFullscreen();
     });
     disconnectBtn.addEventListener('click', () => {
-      if (confirm("Find a new chat partner?")) {
-        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'leave' }));
-        resetConnection();
+      confirmDisconnectModal.classList.remove('hidden');
+    });
+    confirmDisconnectCancelBtn.addEventListener('click', () => {
+      confirmDisconnectModal.classList.add('hidden');
+    });
+    confirmDisconnectOkBtn.addEventListener('click', () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'leave' }));
       }
+      resetConnection();
+      confirmDisconnectModal.classList.add('hidden');
     });
 
     // --- Initial Page Load ---

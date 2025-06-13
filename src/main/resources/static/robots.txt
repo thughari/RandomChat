@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://randomchat-hfta.onrender.com/sitemap.xml
