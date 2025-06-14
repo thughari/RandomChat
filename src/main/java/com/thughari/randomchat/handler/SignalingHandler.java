@@ -185,4 +185,8 @@ public class SignalingHandler extends TextWebSocketHandler {
             }
         }
     }
+
+    public int getActiveConnections() {
+        return sessions.size();
+    }
 }
