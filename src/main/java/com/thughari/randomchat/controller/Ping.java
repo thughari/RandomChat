@@ -12,11 +12,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 @RestController
 @RequestMapping("/ping")
 public class Ping {
-	
+
 	@GetMapping
 	@Async("virtualThreadTaskExecutor")
 	public CompletableFuture<String> ping() {
 		return CompletableFuture.completedFuture("pong");
 	}
-	
+
 }

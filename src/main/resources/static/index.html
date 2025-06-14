@@ -1,18 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
+
     <title>RandomChat - Free Anonymous Video Chat | Connect Instantly</title>
-    <meta name="description" content="Free anonymous video chat app. Connect instantly with random people worldwide. No registration required. Secure peer-to-peer video calls.">
-    <meta name="keywords" content="video chat, random chat, anonymous chat, free video call, WebRTC chat, P2P video, instant video chat, chat with strangers">
-    
+    <meta name="description"
+        content="Free anonymous video chat app. Connect instantly with random people worldwide. No registration required. Secure peer-to-peer video calls.">
+    <meta name="keywords"
+        content="video chat, random chat, anonymous chat, free video call, WebRTC chat, P2P video, instant video chat, chat with strangers omegle">
+
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://randomchat-hfta.onrender.com">
 
     <meta property="og:title" content="RandomChat - Free Anonymous Video Chat">
-    <meta property="og:description" content="Connect instantly with random people worldwide through secure video chat. No registration needed.">
+    <meta property="og:description"
+        content="Connect instantly with random people worldwide through secure video chat. No registration needed.">
     <meta property="og:image" content="https://randomchat-hfta.onrender.com/assets/preview.jpg">
     <meta property="og:url" content="https://randomchat-hfta.onrender.com">
     <meta property="og:type" content="website">
@@ -27,10 +31,12 @@
 
     <link rel="stylesheet" href="index.css?v=1">
 </head>
+
 <body>
     <header>
         <h1>Free Anonymous Video Chat</h1>
-        <p>Connect instantly with random people worldwide. No registration, no login. Just secure, peer-to-peer video calls.</p>
+        <p>Connect instantly with random people worldwide. No registration, no login. Just secure, peer-to-peer video
+            calls.</p>
         <div class="active-users">
             <i class="fa-solid fa-users"></i>
             <span id="user-count">...</span> people online
@@ -71,7 +77,7 @@
                     <li>Start your conversation! Click "Next" to meet someone new.</li>
                 </ol>
             </section>
-            
+
             <section class="bottom-cta">
                 <h2>Ready to Connect?</h2>
                 <button class="cta-button" onclick="openGuidelinesModal()">Join the Conversation</button>
@@ -82,31 +88,37 @@
     <footer>
         <div>© 2025 RandomChat. Built for fun. | <a href="privacy.html">Privacy Policy</a></div>
         <div class="credit">
-            Made with <i class="fa-solid fa-heart"></i> by <a href="https://thughari.github.io" target="_blank" rel="noopener noreferrer">Hari Thatikonda</a>
+            Made with <i class="fa-solid fa-heart"></i> by <a href="https://thughari.github.io" target="_blank"
+                rel="noopener noreferrer">Hari Thatikonda</a>
         </div>
     </footer>
 
     <!-- Guidelines Modal HTML -->
-  <div id="guidelines-modal" class="modal-overlay" onclick="closeGuidelinesModal(event)">
-      <div class="modal-content" onclick="event.stopPropagation()">
-          <h2>Community Guidelines</h2>
-          <div class="modal-body">
-              <p><strong>Welcome!</strong> To keep our community safe and fun for everyone, please agree to these simple rules:</p>
-              <ul>
-                  <li><strong>Be Respectful:</strong> Harassment, hate speech, racism, sexism, or any abusive behavior is strictly forbidden.</li>
-                  <li><strong>No Inappropriate Content:</strong> Do not stream nudity, sexually explicit material, or anything else that is not safe for a general audience.</li>
-                  <li><strong>No Illegal Activities:</strong> Do not promote, engage in, or display any illegal acts.</li>
-                  <li><strong>Protect Your Privacy:</strong> Do not share personal information like your full name, address, or financial details.</li>
-                  <li><strong>No Threats or Violence:</strong> Threats of any kind will not be tolerated.</li>
-              </ul>
-              <p>Violating these rules may result in a ban. You are in control: you can stop a chat at any time.</p>
-          </div>
-          <div class="modal-buttons">
-              <button class="cta-button" onclick="window.location.href='app.html'">I Understand and Agree</button>
-          </div>
-      </div>
-  </div>
-    
+    <div id="guidelines-modal" class="modal-overlay" onclick="closeGuidelinesModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h2>Community Guidelines</h2>
+            <div class="modal-body">
+                <p><strong>Welcome!</strong> To keep our community safe and fun for everyone, please agree to these
+                    simple rules:</p>
+                <ul>
+                    <li><strong>Be Respectful:</strong> Harassment, hate speech, racism, sexism, or any abusive behavior
+                        is strictly forbidden.</li>
+                    <li><strong>No Inappropriate Content:</strong> Do not stream nudity, sexually explicit material, or
+                        anything else that is not safe for a general audience.</li>
+                    <li><strong>No Illegal Activities:</strong> Do not promote, engage in, or display any illegal acts.
+                    </li>
+                    <li><strong>Protect Your Privacy:</strong> Do not share personal information like your full name,
+                        address, or financial details.</li>
+                    <li><strong>No Threats or Violence:</strong> Threats of any kind will not be tolerated.</li>
+                </ul>
+                <p>Violating these rules may result in a ban. You are in control: you can stop a chat at any time.</p>
+            </div>
+            <div class="modal-buttons">
+                <button class="cta-button" onclick="window.location.href='app.html'">I Understand and Agree</button>
+            </div>
+        </div>
+    </div>
+
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
@@ -139,7 +151,7 @@
                 .then(data => {
                     const userCount = document.getElementById('user-count');
                     userCount.textContent = data.count;
-                    
+
                     userCount.classList.add('pulse');
                     setTimeout(() => userCount.classList.remove('pulse'), 1000);
                 })
@@ -153,4 +165,5 @@
         // setInterval(updateUserCount, 60000);
     </script>
 </body>
+
 </html>

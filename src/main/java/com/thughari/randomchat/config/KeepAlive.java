@@ -14,12 +14,12 @@ import org.springframework.web.client.RestTemplate;
 public class KeepAlive {
 
 	private static final Logger logger = LoggerFactory.getLogger(KeepAlive.class);
-	
+
 	@Value("${app.keepalive.url}")
 	private String pingUrl;
-	
+
 	private final RestTemplate restTemplate = new RestTemplate();
-	
+
 	@Scheduled(fixedRate = 300_000)
 	@Async("virtualThreadTaskExecutor")
 	public void keepAliveLog() {

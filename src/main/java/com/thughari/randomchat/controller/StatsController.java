@@ -12,14 +12,14 @@ import java.util.concurrent.CompletableFuture;
 
 @RestController
 public class StatsController {
-    
-    @Autowired
-    private SignalingHandler signalingHandler;
 
-    @GetMapping("/api/active-users")
-    @Async("virtualThreadTaskExecutor")
-    public CompletableFuture<Map<String, Integer>> getActiveUsers() {
-        int activeUsers = signalingHandler.getActiveConnections();
-        return CompletableFuture.completedFuture(Map.of("count", activeUsers));
-    }
+	@Autowired
+	private SignalingHandler signalingHandler;
+
+	@GetMapping("/api/active-users")
+	@Async("virtualThreadTaskExecutor")
+	public CompletableFuture<Map<String, Integer>> getActiveUsers() {
+		int activeUsers = signalingHandler.getActiveConnections();
+		return CompletableFuture.completedFuture(Map.of("count", activeUsers));
+	}
 }

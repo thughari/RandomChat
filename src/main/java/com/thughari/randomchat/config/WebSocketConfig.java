@@ -19,29 +19,29 @@ import java.util.Map;
 public class WebSocketConfig implements WebSocketConfigurer {
 
 	@Autowired
-    private SignalingHandler signalingHandler;
+	private SignalingHandler signalingHandler;
 
-    @Override
-    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(signalingHandler, "/ws")
-                .setAllowedOrigins("*")
-                .addInterceptors(new HandshakeInterceptor() {
-                    @Override
-                    public boolean beforeHandshake(ServerHttpRequest request, 
-                            ServerHttpResponse response, 
-                            WebSocketHandler wsHandler, 
-                            Map<String, Object> attributes) {
-                        ServerHttpResponse res = response;
-                        res.getHeaders().setCacheControl("no-cache, no-store, must-revalidate");
-                        return true;
-                    }
+	@Override
+	public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+		registry.addHandler(signalingHandler, "/ws")
+		.setAllowedOrigins("*")
+		.addInterceptors(new HandshakeInterceptor() {
+			@Override
+			public boolean beforeHandshake(ServerHttpRequest request, 
+					ServerHttpResponse response, 
+					WebSocketHandler wsHandler, 
+					Map<String, Object> attributes) {
+				ServerHttpResponse res = response;
+				res.getHeaders().setCacheControl("no-cache, no-store, must-revalidate");
+				return true;
+			}
 
-					@Override
-					public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
-							WebSocketHandler wsHandler, Exception exception) {
-						// TODO Auto-generated method stub
-						
-					}
-                });
-    }
+			@Override
+			public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
+					WebSocketHandler wsHandler, Exception exception) {
+				// TODO Auto-generated method stub
+
+			}
+		});
+	}
 }

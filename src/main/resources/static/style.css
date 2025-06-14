@@ -1,221 +1,327 @@
 :root {
-      --bg-color: #121212;
-      --surface-color: #1e1e1e;
-      --primary-color: #03dac6;
-      --on-primary-color: #000;
-      --text-color: #e0e0e0;
-      --border-color: #333;
-      --red-color: #cf6679;
-      --red-hover-color: #e07f91;
-      --report-color: #f39c12;
-      --report-hover-color: #e67e22;
-    }
+  --bg-color: #121212;
+  --surface-color: #1e1e1e;
+  --primary-color: #03dac6;
+  --on-primary-color: #000;
+  --text-color: #e0e0e0;
+  --border-color: #333;
+  --red-color: #cf6679;
+  --red-hover-color: #e07f91;
+  --report-color: #f39c12;
+  --report-hover-color: #e67e22;
+}
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-    html, body {
-      height: 100%; width: 100%;
-      overflow: hidden;
-      font-family: 'Roboto', sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-color);
-    }
+html,
+body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: 'Roboto', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
 
-    #app-container {
-      display: flex; flex-direction: column;
-      width: 100%; background-color: #000;
-      height: 100vh; /* Fallback */
-      height: 100dvh; /* Dynamic viewport height for mobile */
-    }
+#app-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background-color: #000;
+  height: 100vh;
+  height: 100dvh;
+}
 
-    .video-container {
-      position: relative; flex-grow: 1;
-      width: 100%; height: 100%;
-      display: flex; justify-content: center; align-items: center;
-      overflow: hidden;
-    }
+.video-container {
+  position: relative;
+  flex-grow: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
 
-    video {
-      transform: scaleX(-1);
-      /* --- THE FIX for Video Clipping --- */
-      object-fit: contain;
-      width: 100%;
-      height: 100%;
-    }
+video {
+  transform: scaleX(-1);
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+}
 
-    #localVideo {
-      position: absolute;
-      bottom: 100px; right: 20px;
-      width: 20vw; max-width: 250px; min-width: 120px;
-      height: auto;
-      border: 2px solid var(--border-color);
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-      border-radius: 8px;
-      transition: all 0.3s ease;
-      z-index: 10;
-    }
-    #localVideo.hidden {
-        opacity: 0; transform: scaleX(-1) scale(0.8); pointer-events: none;
-    }
+#localVideo {
+  position: absolute;
+  bottom: 100px;
+  right: 20px;
+  width: 20vw;
+  max-width: 250px;
+  min-width: 120px;
+  height: auto;
+  border: 2px solid var(--border-color);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  z-index: 10;
+}
 
-    #status-overlay {
-      position: absolute; inset: 0;
-      background-color: rgba(0, 0, 0, 0.7);
-      display: flex; justify-content: center; align-items: center;
-      font-size: 1.5rem; backdrop-filter: blur(8px);
-      z-index: 30; transition: opacity 0.5s ease;
-      text-align: center; padding: 1rem;
-    }
-    #status-overlay.hidden { opacity: 0; pointer-events: none; }
-    
-    #remote-status-container {
-      position: absolute; top: 20px; left: 20px;
-      display: flex; gap: 10px; z-index: 15;
-    }
-    #remote-status-container i {
-        background-color: rgba(0,0,0,0.5); color: var(--red-color);
-        width: 40px; height: 40px; border-radius: 50%;
-        display: flex; justify-content: center; align-items: center;
-        font-size: 1.2rem;
-    }
+#localVideo.hidden {
+  opacity: 0;
+  transform: scaleX(-1) scale(0.8);
+  pointer-events: none;
+}
 
-    .controls {
-      position: absolute; bottom: 0; left: 0; right: 0;
-      display: flex; justify-content: center; align-items: center;
-      padding: 1rem 2rem 1.5rem 2rem; gap: 1.5rem;
-      background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
-      z-index: 20; transition: opacity 0.4s ease, transform 0.4s ease;
-    }
-    .controls.hidden { opacity: 0; transform: translateY(100%); pointer-events: none; }
+#status-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.5rem;
+  backdrop-filter: blur(8px);
+  z-index: 30;
+  transition: opacity 0.5s ease;
+  text-align: center;
+  padding: 1rem;
+}
 
-    .control-btn {
-      background-color: rgba(255, 255, 255, 0.15); color: var(--text-color);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      width: 56px; height: 56px; border-radius: 50%;
-      font-size: 1.4rem; cursor: pointer;
-      display: flex; justify-content: center; align-items: center;
-      transition: all 0.2s ease;
-    }
-    .control-btn:hover:not(:disabled) { background-color: rgba(255, 255, 255, 0.3); }
-    .control-btn:disabled {
-        background-color: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.3);
-        border-color: rgba(255, 255, 255, 0.1); cursor: not-allowed;
-    }
-    .control-btn.active { background-color: var(--primary-color); color: var(--on-primary-color); border-color: var(--primary-color);}
-    #disconnect-btn { background-color: var(--red-color); border-color: var(--red-color); }
-    #disconnect-btn:hover:not(:disabled) { background-color: var(--red-hover-color); }
+#status-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
 
-    /* --- Notification Toast --- */
-    #notification {
-      position: absolute;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background-color: var(--primary-color);
-      color: var(--on-primary-color);
-      padding: 10px 20px;
-      border-radius: 20px;
-      font-weight: 500;
-      z-index: 40;
-      opacity: 0;
-      transition: opacity 0.5s ease, top 0.5s ease;
-      pointer-events: none;
-    }
-    #notification.show {
-      opacity: 1;
-      top: 30px;
-    }
+#remote-status-container {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  gap: 10px;
+  z-index: 15;
+}
 
-    /* Add new report button styles */
-    .report-btn { 
-        background-color: var(--report-color); 
-        border-color: var(--report-color); 
-    }
-    .report-btn:hover:not(:disabled) { 
-        background-color: var(--report-hover-color); 
-    }
+#remote-status-container i {
+  background-color: rgba(0, 0, 0, 0.5);
+  color: var(--red-color);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.2rem;
+}
 
-    /* Add modal styles */
-    .modal-overlay {
-        position: fixed;
-        inset: 0;
-        background-color: rgba(0, 0, 0, 0.7);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        backdrop-filter: blur(8px);
-        z-index: 100;
-        opacity: 1;
-        transition: opacity 0.3s ease;
-    }
+.controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem 2rem 1.5rem 2rem;
+  gap: 1.5rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+  z-index: 20;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
 
-    .modal-overlay.hidden {
-        opacity: 0;
-        pointer-events: none;
-    }
+.controls.hidden {
+  opacity: 0;
+  transform: translateY(100%);
+  pointer-events: none;
+}
 
-    .modal-content {
-        background-color: var(--surface-color);
-        padding: 1.5rem 2rem;
-        border-radius: 12px;
-        width: 90%;
-        max-width: 450px;
-        border: 1px solid var(--border-color);
-        box-shadow: 0 5px 20px rgba(0,0,0,0.5);
-    }
+.control-btn {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-color);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  font-size: 1.4rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.2s ease;
+}
 
-    .modal-content h2 {
-        margin-top: 0;
-        color: var(--primary-color);
-    }
+.control-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.3);
+}
 
-    .modal-content p {
-        margin: 0.5rem 0 1.5rem 0;
-        line-height: 1.5;
-    }
+.control-btn:disabled {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.1);
+  cursor: not-allowed;
+}
 
-    .modal-buttons {
-        display: flex;
-        justify-content: flex-end;
-        gap: 1rem;
-        margin-top: 2rem;
-    }
+.control-btn.active {
+  background-color: var(--primary-color);
+  color: var(--on-primary-color);
+  border-color: var(--primary-color);
+}
 
-    .modal-btn {
-        border: none;
-        padding: 0.75rem 1.5rem;
-        border-radius: 25px;
-        font-weight: 500;
-        font-size: 1rem;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
-    }
+#disconnect-btn {
+  background-color: var(--red-color);
+  border-color: var(--red-color);
+}
 
-    .cancel-btn {
-        background-color: transparent;
-        color: var(--text-color);
-    }
+#disconnect-btn:hover:not(:disabled) {
+  background-color: var(--red-hover-color);
+}
 
-    .cancel-btn:hover {
-        background-color: rgba(255,255,255,0.1);
-    }
+#notification {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--primary-color);
+  color: var(--on-primary-color);
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-weight: 500;
+  z-index: 40;
+  opacity: 0;
+  transition: opacity 0.5s ease, top 0.5s ease;
+  pointer-events: none;
+}
 
-    .submit-btn {
-        background-color: var(--red-color);
-        color: #fff;
-    }
+#notification.show {
+  opacity: 1;
+  top: 30px;
+}
 
-    .submit-btn:hover {
-        background-color: var(--red-hover-color);
-    }
+.report-btn {
+  background-color: var(--report-color);
+  border-color: var(--report-color);
+}
 
-    .confirm-modal-content {
-        text-align: center;
-    }
+.report-btn:hover:not(:disabled) {
+  background-color: var(--report-hover-color);
+}
 
-    @media (max-width: 768px) {
-      #localVideo { bottom: 85px; right: 15px; }
-      .controls { padding: 0.75rem 1rem 1rem 1rem; gap: 1rem; flex-wrap: wrap; }
-      .control-btn { width: 48px; height: 48px; font-size: 1.1rem; }
-      .modal-content { width: 95%; padding: 1.25rem; }
-    }
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(8px);
+  z-index: 100;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.modal-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.modal-content {
+  background-color: var(--surface-color);
+  padding: 1.5rem 2rem;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 450px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+}
+
+.modal-content h2 {
+  margin-top: 0;
+  color: var(--primary-color);
+}
+
+.modal-content p {
+  margin: 0.5rem 0 1.5rem 0;
+  line-height: 1.5;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.modal-btn {
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 25px;
+  font-weight: 500;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.cancel-btn {
+  background-color: transparent;
+  color: var(--text-color);
+}
+
+.cancel-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.submit-btn {
+  background-color: var(--red-color);
+  color: #fff;
+}
+
+.submit-btn:hover {
+  background-color: var(--red-hover-color);
+}
+
+.confirm-modal-content {
+  text-align: center;
+}
+
+.video-off {
+  background-color: #000;
+}
+
+.video-disabled {
+  background-color: #000;
+}
+
+#localVideo.hidden {
+  display: none !important;
+}
+
+#localVideo.video-disabled:not(.hidden) {
+  display: block;
+  background-color: #000;
+}
+
+@media (max-width: 768px) {
+  #localVideo {
+    bottom: 85px;
+    right: 15px;
+  }
+
+  .controls {
+    padding: 0.75rem 1rem 1rem 1rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .control-btn {
+    width: 48px;
+    height: 48px;
+    font-size: 1.1rem;
+  }
+
+  .modal-content {
+    width: 95%;
+    padding: 1.25rem;
+  }
+}
