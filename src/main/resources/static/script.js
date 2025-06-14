@@ -198,14 +198,13 @@ async function ensurePeerConnection() {
 function configurePeerConnectionEventListeners() {
   peerConnection.onicecandidate = (e) => {
     if (e.candidate) {
-      console.log('New ICE candidate:', e.candidate.type);
       ws.send(JSON.stringify({ type: "ice", candidate: e.candidate }));
     }
   };
 
   peerConnection.oniceconnectionstatechange = () => {
     const state = peerConnection.iceConnectionState;
-    console.log(`ICE State: ${state}`);
+    // console.log(`ICE State: ${state}`);
 
     switch (state) {
       case "checking":
@@ -238,28 +237,28 @@ function configurePeerConnectionEventListeners() {
     }
   };
 
-  // Add connection quality monitoring
-  setInterval(() => {
-    if (peerConnection?.getStats) {
-      peerConnection.getStats().then(stats => {
-        stats.forEach(report => {
-          if (report.type === "candidate-pair" && report.state === "succeeded") {
-            console.log("Connection Quality:", 
-              report.availableOutgoingBitrate || 
-              report.availableIncomingBitrate);
-          }
-        });
-      });
-    }
-  }, 3000);
+  // // Add connection quality monitoring
+  // setInterval(() => {
+  //   if (peerConnection?.getStats) {
+  //     peerConnection.getStats().then(stats => {
+  //       stats.forEach(report => {
+  //         if (report.type === "candidate-pair" && report.state === "succeeded") {
+  //           console.log("Connection Quality:", 
+  //             report.availableOutgoingBitrate || 
+  //             report.availableIncomingBitrate);
+  //         }
+  //       });
+  //     });
+  //   }
+  // }, 3000);
 
-  peerConnection.onconnectionstatechange = () => {
-    console.log(`Connection State: ${peerConnection.connectionState}`);
-  };
+  // peerConnection.onconnectionstatechange = () => {
+  //   console.log(`Connection State: ${peerConnection.connectionState}`);
+  // };
 
-  peerConnection.onicegatheringstatechange = () => {
-    console.log(`ICE Gathering State: ${peerConnection.iceGatheringState}`);
-  };
+  // peerConnection.onicegatheringstatechange = () => {
+  //   console.log(`ICE Gathering State: ${peerConnection.iceGatheringState}`);
+  // };
 
   peerConnection.ontrack = (event) => {
     if (remoteVideo.srcObject !== event.streams[0]) {
@@ -285,7 +284,7 @@ async function ensureLocalMediaAndTracks() {
 }
 
 async function processQueuedIceCandidates() {
-  console.log(`Processing ${remoteIceCandidatesQueue.length} queued candidates`);
+  // console.log(`Processing ${remoteIceCandidatesQueue.length} queued candidates`);
   const candidates = [...remoteIceCandidatesQueue];
   remoteIceCandidatesQueue = [];
 
@@ -293,7 +292,7 @@ async function processQueuedIceCandidates() {
     try {
       if (peerConnection.remoteDescription) {
         await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-        console.log('Added queued ICE candidate');
+        // console.log('Added queued ICE candidate', candidate.type);
       } else {
         remoteIceCandidatesQueue.push(candidate);
         console.log('Remote description not set, re-queuing candidate');
