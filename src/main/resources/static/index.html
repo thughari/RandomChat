@@ -18,14 +18,14 @@
     <meta property="og:type" content="website">
 
     <meta name="author" content="Hari Thatikonda">
-    <link rel="shortcut icon" href="assets/spider.png" type="image/x-icon">
+    <link rel="shortcut icon" href="assets/spider.png?v=1" type="image/x-icon">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css">
 
-    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="index.css?v=1">
 </head>
 <body>
     <header>
@@ -146,9 +146,11 @@
                 .catch(error => console.error('Error fetching user count:', error));
         }
 
-        // Update count every 30 seconds
+        // Initial user count update
         updateUserCount();
-        setInterval(updateUserCount, 30000);
+
+        // Update count every 60 seconds
+        // setInterval(updateUserCount, 60000);
     </script>
 </body>
 </html>

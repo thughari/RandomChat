@@ -99,7 +99,6 @@ public class SignalingHandler extends TextWebSocketHandler {
         sessions.remove(sessionId);
         waitingUsers.remove(sessionId);
         handlePeerDisconnection(sessionId);
-        logger.info("Total active sessions after close: {}", sessions.size());
     }
 
     private void tryToPairUser(String newUserId) {
@@ -113,7 +112,6 @@ public class SignalingHandler extends TextWebSocketHandler {
             if (waitingUserId == null) {
                 if (!waitingUsers.contains(newUserId)) {
                     waitingUsers.add(newUserId);
-                    logger.info("Queue size: {}", waitingUsers.size());
                 }
                 break;
             }

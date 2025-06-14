@@ -20,7 +20,6 @@ public class StatsController {
     @Async("virtualThreadTaskExecutor")
     public CompletableFuture<Map<String, Integer>> getActiveUsers() {
         int activeUsers = signalingHandler.getActiveConnections();
-        System.out.println(Thread.currentThread());
         return CompletableFuture.completedFuture(Map.of("count", activeUsers));
     }
 }
