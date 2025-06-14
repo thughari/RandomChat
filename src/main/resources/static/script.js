@@ -28,6 +28,7 @@ const confirmDisconnectCancelBtn = document.getElementById(
 let peerConnection, localStream, controlsTimeout;
 let remoteIceCandidatesQueue = [];
 const instanceId = Math.random().toString(36).substring(7);
+let cachedTurnConfig = null;
 
 // --- Notification Logic ---
 function showNotification(message) {
@@ -162,20 +163,17 @@ async function ensurePeerConnection() {
     if (peerConnection && peerConnection.signalingState !== "closed") return;
     
     remoteIceCandidatesQueue = [];
-    const turnConfig = await fetch("/api/turn-config")
-      .then((res) => res.json())
-      .catch((e) => {
-        console.warn('Failed to fetch TURN config:', e);
-        return {};
-      });
+    const turnConfig = await fetchTurnConfig();
 
     peerConnection = new RTCPeerConnection({
       iceServers: [
         { 
           urls: [
+            'stun:stun.l.google.com:19302',
             'stun:stun1.l.google.com:19302',
             'stun:stun2.l.google.com:19302',
-            'stun:stun3.l.google.com:19302'
+            'stun:stun3.l.google.com:19302',
+            'stun:stun4.l.google.com:19302'
           ]
         },
         ...(turnConfig.iceServers || [])
@@ -183,7 +181,12 @@ async function ensurePeerConnection() {
       iceTransportPolicy: "all",
       bundlePolicy: "max-bundle",
       rtcpMuxPolicy: "require",
-      iceCandidatePoolSize: 1
+      iceCandidatePoolSize: 5,
+      sdpSemantics: 'unified-plan',
+      // Add these connection configurations
+      iceServersPolicy: "all",
+      iceConnectionTimeoutInMs: 10000,
+      retransmitExtrapolatedRtpPackets: true
     });
 
     configurePeerConnectionEventListeners();
@@ -196,32 +199,60 @@ async function ensurePeerConnection() {
 function configurePeerConnectionEventListeners() {
   peerConnection.onicecandidate = (e) => {
     if (e.candidate) {
+      console.log('New ICE candidate:', e.candidate.type);
       ws.send(JSON.stringify({ type: "ice", candidate: e.candidate }));
     }
   };
 
   peerConnection.oniceconnectionstatechange = () => {
-    console.log(`ICE State: ${peerConnection.iceConnectionState}`);
+    const state = peerConnection.iceConnectionState;
+    console.log(`ICE State: ${state}`);
 
-    // Handle disconnections
-    if (
-      peerConnection.iceConnectionState === "disconnected" ||
-      peerConnection.iceConnectionState === "failed"
-    ) {
-      console.log("Connection lost, attempting reconnection...");
-
-      // Attempt reconnection
-      peerConnection.restartIce();
-
-      // If still failed after 5 seconds, reset
-      setTimeout(() => {
-        if (peerConnection.iceConnectionState === "failed") {
-          showNotification("Connection failed. Finding new partner...");
-          resetConnection();
-        }
-      }, 5000);
+    switch (state) {
+      case "checking":
+        updateStatus("Establishing connection...", false);
+        break;
+      case "connected":
+        updateStatus("", false);
+        break;
+      case "disconnected":
+        console.log("Connection lost, attempting reconnection...");
+        // Try immediate reconnection
+        peerConnection.restartIce();
+        break;
+      case "failed":
+        // Wait a bit before trying one last time
+        setTimeout(() => {
+          if (peerConnection.iceConnectionState === "failed") {
+            createOfferWithIceRestart()
+              .then(offer => {
+                peerConnection.setLocalDescription(offer);
+                ws.send(JSON.stringify({ type: "offer", offer: offer }));
+            })
+              .catch(() => {
+                showNotification("Connection failed. Finding new partner...");
+                resetConnection();
+            });
+          }
+        }, 3000);
+        break;
     }
   };
+
+  // Add connection quality monitoring
+  setInterval(() => {
+    if (peerConnection?.getStats) {
+      peerConnection.getStats().then(stats => {
+        stats.forEach(report => {
+          if (report.type === "candidate-pair" && report.state === "succeeded") {
+            console.log("Connection Quality:", 
+              report.availableOutgoingBitrate || 
+              report.availableIncomingBitrate);
+          }
+        });
+      });
+    }
+  }, 3000);
 
   peerConnection.onconnectionstatechange = () => {
     console.log(`Connection State: ${peerConnection.connectionState}`);
@@ -255,13 +286,22 @@ async function ensureLocalMediaAndTracks() {
 }
 
 async function processQueuedIceCandidates() {
-  while (remoteIceCandidatesQueue.length > 0) {
-    const candidate = remoteIceCandidatesQueue.shift();
-    if (peerConnection.remoteDescription)
-      await peerConnection.addIceCandidate(candidate);
-    else {
-      remoteIceCandidatesQueue.unshift(candidate);
-      break;
+  console.log(`Processing ${remoteIceCandidatesQueue.length} queued candidates`);
+  const candidates = [...remoteIceCandidatesQueue];
+  remoteIceCandidatesQueue = [];
+
+  for (const candidate of candidates) {
+    try {
+      if (peerConnection.remoteDescription) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        console.log('Added queued ICE candidate');
+      } else {
+        remoteIceCandidatesQueue.push(candidate);
+        console.log('Remote description not set, re-queuing candidate');
+        break;
+      }
+    } catch (e) {
+      console.error('Error adding queued candidate:', e);
     }
   }
 }
@@ -404,7 +444,11 @@ confirmDisconnectOkBtn.addEventListener("click", () => {
 // --- Initial Page Load ---
 async function initialize() {
   try {
-    await startMedia();
+    // Fetch TURN config in parallel with media access
+    const [_, mediaResult] = await Promise.all([
+      fetchTurnConfig(),
+      startMedia()
+    ]);
     showControls();
   } catch (e) {
     console.error(`Initialization failed:`, e);
@@ -425,5 +469,19 @@ async function createOfferWithIceRestart() {
     } catch (error) {
         console.error('Error creating offer:', error);
         throw error;
+    }
+}
+
+// Add this new function to fetch TURN config once
+async function fetchTurnConfig() {
+    if (cachedTurnConfig) return cachedTurnConfig;
+    
+    try {
+        const response = await fetch("/api/turn-config");
+        cachedTurnConfig = await response.json();
+        return cachedTurnConfig;
+    } catch (e) {
+        console.warn('Failed to fetch TURN config:', e);
+        return {};
     }
 }
