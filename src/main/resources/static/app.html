@@ -1,357 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="assets/spider.png?v=1" type="image/x-icon">
   <title>Random Video Chat</title>
-  <style>
-    video {
-      width: 45%;
-      margin: 10px;
-      border: 2px solid #ccc;
-      border-radius: 10px;
-    }
-    body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      flex-direction: column;
-    }
-    #status {
-      margin-top: 10px;
-      font-weight: bold;
-    }
-  </style>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css">
+
+  <link rel="stylesheet" href="style.css?v=1">
+
 </head>
+
 <body>
-  <h2>Random Video Chat</h2>
-  <div id="status">Connecting to server...</div>
-  <div>
-    <video id="localVideo" autoplay muted playsinline></video>
-    <video id="remoteVideo" autoplay playsinline></video>
+
+  <div class="app-container" id="app-container">
+    <div class="video-container" id="video-container">
+      <div id="status-overlay">
+        <span id="status-text">Searching for a partner...</span>
+      </div>
+
+      <div id="remote-status-container"></div>
+      <div id="notification"></div>
+
+      <video id="remoteVideo" autoplay playsinline></video>
+      <video id="localVideo" autoplay muted playsinline></video>
+
+      <div class="controls" id="controls">
+        <button id="mic-btn" class="control-btn active" title="Mute/Unmute Mic" disabled><i
+            class="fa-solid fa-microphone"></i></button>
+        <button id="video-btn" class="control-btn active" title="Stop/Start Video" disabled><i
+            class="fa-solid fa-video"></i></button>
+        <button id="self-view-btn" class="control-btn active" title="Hide/Show Self View" disabled><i
+            class="fa-solid fa-eye"></i></button>
+        <button id="disconnect-btn" class="control-btn" title="Find New Partner" disabled><i
+            class="fa-solid fa-forward"></i></button>
+        <button id="fullscreen-btn" class="control-btn" title="Toggle Fullscreen"><i
+            class="fa-solid fa-expand"></i></button>
+        <button id="report-btn" class="control-btn report-btn" title="Report User" disabled><i
+            class="fa-solid fa-flag"></i></button>
+      </div>
+    </div>
   </div>
 
-  <script>
-    const localVideo = document.getElementById("localVideo");
-    const remoteVideo = document.getElementById("remoteVideo");
-    const statusDiv = document.getElementById("status");
-    let peerConnection;
-    let localStream;
-    let remoteIceCandidatesQueue = [];
-    let instanceId = Math.random().toString(36).substring(7); // Unique ID for this tab for logging
+  <!-- Disconnect Confirmation Modal -->
+  <div id="confirm-disconnect-modal" class="modal-overlay hidden">
+    <div class="modal-content confirm-modal-content">
+      <h2>Find New Partner?</h2>
+      <p>Are you sure you want to disconnect and find a new chat partner?</p>
+      <div class="modal-buttons">
+        <button id="confirm-disconnect-cancel-btn" class="modal-btn cancel-btn">Cancel</button>
+        <button id="confirm-disconnect-ok-btn" class="modal-btn submit-btn">Yes, Find New</button>
+      </div>
+    </div>
+  </div>
 
-    console.log(`[${instanceId}] Initializing Client`);
+  <script src="script.js?v=1"></script>
 
-    // --- WebSocket Setup ---
-    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsHost = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-                   ? "localhost:8080"
-                   : window.location.host;
-    const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
-
-    console.log(`[${instanceId}] Attempting to connect to WebSocket at: ${ws.url}`);
-
-    ws.onopen = () => {
-      console.log(`[${instanceId}] WebSocket connection established.`);
-      statusDiv.textContent = "Connected to server. Waiting for a peer...";
-    };
-
-    ws.onmessage = async (message) => {
-      console.log(`[${instanceId}] WebSocket message received:`, message.data);
-      const data = JSON.parse(message.data);
-
-      switch (data.type) {
-        case 'initiateOffer':
-          statusDiv.textContent = "Peer found! Initiating call...";
-          console.log(`[${instanceId}] Received initiateOffer. Creating offer...`);
-          await ensurePeerConnection();
-          await ensureLocalMediaAndTracks(`[${instanceId}] initiateOffer`);
-
-          console.log(`[${instanceId}] Creating offer...`);
-          const offer = await peerConnection.createOffer();
-          await peerConnection.setLocalDescription(offer);
-          ws.send(JSON.stringify({ type: 'offer', offer: offer }));
-          console.log(`[${instanceId}] Sent offer:`, offer);
-          break;
-
-        case 'waitForOffer':
-          statusDiv.textContent = "Peer found! Waiting for them to call...";
-          console.log(`[${instanceId}] Received waitForOffer. Awaiting offer from peer...`);
-          await ensurePeerConnection();
-          await ensureLocalMediaAndTracks(`[${instanceId}] waitForOffer`); // Prepare to send our media in the answer
-          console.log(`[${instanceId}] Ready to receive offer.`);
-          break;
-
-        case 'offer':
-          console.log(`[${instanceId}] Received offer:`, data.offer);
-          await ensurePeerConnection();
-          try {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-            console.log(`[${instanceId}] Set remote description from offer.`);
-            await processQueuedIceCandidates(`[${instanceId}] after offer remote desc`);
-
-            await ensureLocalMediaAndTracks(`[${instanceId}] offer processing`);
-
-            console.log(`[${instanceId}] Creating answer...`);
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            ws.send(JSON.stringify({ type: 'answer', answer: answer }));
-            console.log(`[${instanceId}] Sent answer:`, answer);
-          } catch (error) {
-            console.error(`[${instanceId}] Error processing offer:`, error);
-            statusDiv.textContent = "Error processing offer.";
-          }
-          break;
-
-        case 'answer':
-          console.log(`[${instanceId}] Received answer:`, data.answer);
-          try {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-            console.log(`[${instanceId}] Set remote description from answer.`);
-            await processQueuedIceCandidates(`[${instanceId}] after answer remote desc`);
-          } catch (error) {
-            console.error(`[${instanceId}] Error processing answer:`, error);
-            statusDiv.textContent = "Error processing answer.";
-          }
-          break;
-
-        case 'ice':
-          console.log(`[${instanceId}] Received ICE candidate:`, data.candidate);
-          if (data.candidate) {
-            try {
-              if (peerConnection && peerConnection.remoteDescription && peerConnection.signalingState !== "closed") {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-                console.log(`[${instanceId}] Added ICE candidate immediately.`);
-              } else {
-                remoteIceCandidatesQueue.push(data.candidate);
-                console.log(`[${instanceId}] Queued ICE candidate. PC exists: ${!!peerConnection}, remoteDesc set: ${!!peerConnection?.remoteDescription}, signalingState: ${peerConnection?.signalingState}`);
-              }
-            } catch (e) {
-              console.error(`[${instanceId}] Error adding received ICE candidate:`, e);
-            }
-          }
-          break;
-
-        case 'leave':
-          console.log(`[${instanceId}] Peer disconnected.`);
-          statusDiv.textContent = "Peer disconnected. Waiting for a new peer...";
-          alert("Peer has disconnected.");
-          resetConnection();
-          break;
-
-        default:
-          console.warn(`[${instanceId}] Unknown message type received:`, data.type);
-      }
-    };
-
-    ws.onclose = (event) => {
-      console.log(`[${instanceId}] WebSocket connection closed:`, event.reason, "Code:", event.code);
-      statusDiv.textContent = "Disconnected from server. Please refresh.";
-      resetConnection();
-    };
-
-    ws.onerror = (error) => {
-      console.error(`[${instanceId}] WebSocket error:`, error);
-      statusDiv.textContent = "Error connecting to server. Check console.";
-    };
-
-    async function ensurePeerConnection() {
-      if (!peerConnection || peerConnection.signalingState === "closed") {
-        console.log(`[${instanceId}] Creating new RTCPeerConnection. Previous state: ${peerConnection?.signalingState}`);
-        if(peerConnection) peerConnection.close();
-        remoteIceCandidatesQueue = [];
-        
-        // Fetch TURN credentials
-        const turnConfig = await fetch('/api/turn-config').then(res => res.json());
-        
-        peerConnection = new RTCPeerConnection({
-          iceServers: [
-            { 
-              urls: 'stun:stun.l.google.com:19302' 
-            }, 
-            {
-              urls: "turn:global.turn.twilio.com:3478?transport=udp",
-              username: turnConfig.username,
-              credential: turnConfig.credential
-            },
-            {
-              urls: "turn:global.turn.twilio.com:3478?transport=tcp",
-              username: turnConfig.username,
-              credential: turnConfig.credential
-            },
-            {
-              urls: "turn:global.turn.twilio.com:443?transport=tcp",
-              username: turnConfig.username,
-              credential: turnConfig.credential
-            }
-          ]
-        });
-        configurePeerConnectionEventListeners();
-      } else {
-        console.log(`[${instanceId}] Reusing existing RTCPeerConnection. State: ${peerConnection.signalingState}`);
-      }
-    }
-    
-    function configurePeerConnectionEventListeners() {
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-            console.log(`[${instanceId}] Generated local ICE candidate:`, event.candidate);
-            ws.send(JSON.stringify({ type: 'ice', candidate: event.candidate }));
-            } else {
-            console.log(`[${instanceId}] All local ICE candidates have been sent.`);
-            }
-        };
-
-        peerConnection.oniceconnectionstatechange = () => {
-            console.log(`[${instanceId}] ICE connection state change: ${peerConnection.iceConnectionState}`);
-            statusDiv.textContent = `ICE Status: ${peerConnection.iceConnectionState}`;
-            if (peerConnection.iceConnectionState === 'connected' || peerConnection.iceConnectionState === 'completed') {
-                // statusDiv.textContent = "Call connected!"; // Moved this to ontrack for visual confirmation
-            } else if (['failed', 'disconnected', 'closed'].includes(peerConnection.iceConnectionState)) {
-                // Consider more robust reset or retry logic
-                console.warn(`[${instanceId}] ICE connection became ${peerConnection.iceConnectionState}.`);
-            }
-        };
-
-        peerConnection.ontrack = (event) => {
-            console.log(`[${instanceId}] ONTRACK EVENT FIRED! Streams:`, event.streams);
-            if (event.streams && event.streams[0]) {
-                console.log(`[${instanceId}] Track received from remote peer. Stream ID: ${event.streams[0].id}. Tracks in stream: ${event.streams[0].getTracks().length}`);
-                event.streams[0].getTracks().forEach(track => {
-                    console.log(`[${instanceId}] Remote track: kind=${track.kind}, id=${track.id}, label=${track.label}, readyState=${track.readyState}`);
-                });
-                if (remoteVideo.srcObject !== event.streams[0]) {
-                    remoteVideo.srcObject = event.streams[0];
-                    console.log(`[${instanceId}] Remote video stream set to stream ID: ${event.streams[0].id}`);
-                    statusDiv.textContent = "Call connected!";
-                } else {
-                    console.log(`[${instanceId}] Remote video srcObject already set to this stream.`);
-                }
-            } else {
-                console.warn(`[${instanceId}] Ontrack event fired but event.streams[0] is not valid. event.streams:`, event.streams);
-            }
-        };
-
-        peerConnection.onsignalingstatechange = () => {
-            console.log(`[${instanceId}] Signaling state change: ${peerConnection.signalingState}`);
-        };
-
-        peerConnection.onnegotiationneeded = () => {
-            console.log(`[${instanceId}] Negotiation needed event fired.`);
-            // This event can be tricky. For simple cases, if the initiator creates an offer
-            // and the answerer responds, it might not be strictly necessary to handle it,
-            // but complex scenarios (like adding/removing tracks mid-call) would.
-            // For now, we let our explicit offer/answer flow handle it.
-        };
-    }
-
-
-    async function ensureLocalMediaAndTracks(callerContext) {
-        console.log(`[${instanceId}] ensureLocalMediaAndTracks called from: ${callerContext}`);
-        if (!localStream) {
-            console.log(`[${instanceId}] Local stream not yet available, attempting to start media.`);
-            await startMedia(callerContext); // Wait for media to start
-        }
-
-        if (localStream && peerConnection && peerConnection.signalingState !== "closed") {
-            const senders = peerConnection.getSenders();
-            let tracksAddedNow = 0;
-            localStream.getTracks().forEach(track => {
-                // Check if a sender for this track kind already exists
-                if (!senders.find(sender => sender.track && sender.track.kind === track.kind)) {
-                    try {
-                        peerConnection.addTrack(track, localStream);
-                        console.log(`[${instanceId}] Added local ${track.kind} track to PeerConnection from ${callerContext}. Track ID: ${track.id}`);
-                        tracksAddedNow++;
-                    } catch (e) {
-                        console.error(`[${instanceId}] Error adding track from ${callerContext}:`, e);
-                    }
-                } else {
-                     console.log(`[${instanceId}] Local ${track.kind} track already has a sender in PeerConnection (from ${callerContext}).`);
-                }
-            });
-            if (tracksAddedNow > 0) {
-                console.log(`[${instanceId}] Added ${tracksAddedNow} new tracks. Total senders: ${peerConnection.getSenders().length}`);
-            }
-        } else {
-            console.warn(`[${instanceId}] Could not add tracks from ${callerContext}. localStream: ${!!localStream}, peerConnection: ${!!peerConnection}, pc.signalingState: ${peerConnection?.signalingState}`);
-        }
-    }
-
-
-    async function processQueuedIceCandidates(callerContext) {
-      console.log(`[${instanceId}] processQueuedIceCandidates called from: ${callerContext}. Queue size: ${remoteIceCandidatesQueue.length}`);
-      while (remoteIceCandidatesQueue.length > 0) {
-        const candidate = remoteIceCandidatesQueue.shift();
-        if (peerConnection && peerConnection.remoteDescription && peerConnection.signalingState !== "closed") {
-            console.log(`[${instanceId}] Processing queued ICE candidate:`, candidate);
-            try {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-                console.log(`[${instanceId}] Added queued ICE candidate successfully.`);
-            } catch (e) {
-                console.error(`[${instanceId}] Error adding queued ICE candidate:`, e);
-            }
-        } else {
-            console.warn(`[${instanceId}] Re-queuing ICE candidate as conditions not met. PC exists: ${!!peerConnection}, remoteDesc set: ${!!peerConnection?.remoteDescription}, signalingState: ${peerConnection?.signalingState}`);
-            remoteIceCandidatesQueue.unshift(candidate); // Put it back at the front
-            break; // Stop processing if conditions aren't right, will try again later
-        }
-      }
-    }
-
-    function resetConnection() {
-      console.log(`[${instanceId}] Resetting connection.`);
-      if (peerConnection) {
-        // Remove event listeners to prevent errors after close
-        peerConnection.onicecandidate = null;
-        peerConnection.oniceconnectionstatechange = null;
-        peerConnection.ontrack = null;
-        peerConnection.onsignalingstatechange = null;
-        peerConnection.onnegotiationneeded = null;
-        if (peerConnection.signalingState !== "closed") {
-            peerConnection.close();
-        }
-        peerConnection = null;
-      }
-      remoteVideo.srcObject = null;
-      remoteIceCandidatesQueue = [];
-      statusDiv.textContent = "Ready for new connection...";
-      // Do NOT stop localStream or set localVideo.srcObject = null here,
-      // as we want to keep the local camera feed active for the next call.
-      // Re-initialize for a new call attempt if desired, or wait for server.
-      // For this example, we'll implicitly wait for new signaling.
-      // initialize(); // Optionally, immediately try to set up for a new call
-    }
-
-    async function startMedia(callerContext) {
-      if (localStream) {
-        console.log(`[${instanceId}] Local media stream already exists (caller: ${callerContext}).`);
-        return;
-      }
-      try {
-        console.log(`[${instanceId}] Requesting user media (video and audio) (caller: ${callerContext})...`);
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        localVideo.srcObject = localStream;
-        console.log(`[${instanceId}] Local media stream obtained (caller: ${callerContext}). Stream ID: ${localStream.id}`);
-      } catch (err) {
-        console.error(`[${instanceId}] Error accessing media devices (caller: ${callerContext}):`, err);
-        statusDiv.textContent = "Error accessing media: " + err.message;
-        alert("Could not access camera/microphone: " + err.message);
-        throw err;
-      }
-    }
-
-    async function initialize() {
-        console.log(`[${instanceId}] --- Page Load Initialization ---`);
-        await ensurePeerConnection(); // Create PC early
-        // We will call ensureLocalMediaAndTracks within the signaling flow
-        // to make sure tracks are added right before offer/answer.
-        // For example, if 'initiateOffer' comes, we ensure media and tracks then.
-        // If 'waitForOffer' comes, we ensure media and tracks then, ready for when the offer arrives.
-    }
-
-    initialize().catch(e => console.error(`[${instanceId}] Initialization failed:`, e));
-
-  </script>
 </body>
+
 </html>
