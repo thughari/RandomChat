@@ -87,7 +87,7 @@ const wsHost =
 const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
 ws.onopen = () => {
   console.log(`[${instanceId}] WebSocket connected.`);
-  // --- AUTO-CONNECT: Signal server we are ready on connect ---
+  // --- AUTO-CONNECT ---
   ws.send(JSON.stringify({ type: "ready_for_peer" }));
 };
 ws.onclose = () => {
@@ -314,7 +314,7 @@ function resetConnection() {
   setControlsEnabled(false);
   updateStatus("Searching for a new partner...");
   showControls();
-  // --- AUTO-CONNECT: After resetting, tell server we are ready again ---
+  // --- AUTO-CONNECT ---
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type: "ready_for_peer" }));
   }
@@ -455,7 +455,7 @@ async function initialize() {
 
 initialize();
 
-// Add this function after the configurePeerConnectionEventListeners function
+
 async function createOfferWithIceRestart() {
     try {
         const offer = await peerConnection.createOffer({
@@ -470,7 +470,7 @@ async function createOfferWithIceRestart() {
     }
 }
 
-// Add this new function to fetch TURN config once
+// function to fetch TURN config once
 async function fetchTurnConfig() {
     if (cachedTurnConfig) return cachedTurnConfig;
     
