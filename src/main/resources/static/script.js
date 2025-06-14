@@ -1,4 +1,3 @@
-// --- UI Elements ---
 const localVideo = document.getElementById("localVideo"),
   remoteVideo = document.getElementById("remoteVideo");
 const statusOverlay = document.getElementById("status-overlay"),
@@ -88,11 +87,12 @@ const wsHost =
 const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
 ws.onopen = () => {
   console.log(`[${instanceId}] WebSocket connected.`);
+  // --- AUTO-CONNECT: Signal server we are ready on connect ---
   ws.send(JSON.stringify({ type: "ready_for_peer" }));
 };
 ws.onclose = () => {
   updateStatus("Disconnected. Please refresh.");
-  resetConnection(false);
+  resetConnection();
 };
 ws.onerror = () => updateStatus("Connection error. Check console.");
 
@@ -104,13 +104,7 @@ ws.onmessage = async (message) => {
       setControlsEnabled(true);
       await ensurePeerConnection();
       await ensureLocalMediaAndTracks();
-      //
-      // =========================== CRITICAL FIX #1 ===========================
-      // CREATE A STANDARD OFFER. DO NOT USE `iceRestart: true` for a new connection.
-      //
-      const offer = await peerConnection.createOffer();
-      // =======================================================================
-      //
+      const offer = await createOfferWithIceRestart();
       await peerConnection.setLocalDescription(offer);
       ws.send(JSON.stringify({ type: "offer", offer: offer }));
       break;
@@ -165,41 +159,46 @@ ws.onmessage = async (message) => {
 
 // --- WebRTC Core Functions ---
 async function ensurePeerConnection() {
+  try {
     if (peerConnection && peerConnection.signalingState !== "closed") return;
-
+    
     remoteIceCandidatesQueue = [];
-    const turnCredentials = await fetchTurnConfig();
+    const turnConfig = await fetchTurnConfig();
 
-    const configuration = {
-        iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' }
-        ]
-    };
-    
-    // This is a robust way to add TURN servers ONLY if the API call was successful
-    if (turnCredentials.username) {
-        console.log("Adding TURN servers to configuration.");
-        configuration.iceServers.push(
-            {
-                urls: "turn:global.turn.twilio.com:3478?transport=udp",
-                username: turnCredentials.username,
-                credential: turnCredentials.credential
-            },
-            {
-                urls: "turn:global.turn.twilio.com:3478?transport=tcp",
-                username: turnCredentials.username,
-                credential: turnCredentials.credential
-            }
-        );
-    }
-    
-    peerConnection = new RTCPeerConnection(configuration);
+    peerConnection = new RTCPeerConnection({
+      iceServers: [
+        { 
+          urls: 'stun:stun.l.google.com:19302' 
+        },
+        {
+          urls: "turn:global.turn.twilio.com:3478?transport=udp",
+          username: turnConfig.username,
+          credential: turnConfig.credential
+        },
+        {
+          urls: "turn:global.turn.twilio.com:3478?transport=tcp",
+          username: turnConfig.username,
+          credential: turnConfig.credential
+        },
+        {
+          urls: "turn:global.turn.twilio.com:443?transport=tcp",
+          username: turnConfig.username,
+          credential: turnConfig.credential
+        }
+      ]
+    });
+
     configurePeerConnectionEventListeners();
+  } catch (error) {
+    console.error('Error ensuring peer connection:', error);
+    throw error;
+  }
 }
 
 function configurePeerConnectionEventListeners() {
   peerConnection.onicecandidate = (e) => {
     if (e.candidate) {
+      console.log('New ICE candidate:', e.candidate.type);
       ws.send(JSON.stringify({ type: "ice", candidate: e.candidate }));
     }
   };
@@ -207,24 +206,52 @@ function configurePeerConnectionEventListeners() {
   peerConnection.oniceconnectionstatechange = () => {
     const state = peerConnection.iceConnectionState;
     console.log(`ICE State: ${state}`);
-    
-    //
-    // =========================== CRITICAL FIX #2 ===========================
-    // SIMPLIFIED AND CORRECT RECONNECTION LOGIC
-    //
-    if (state === "failed") {
-        console.log("Connection failed, attempting to restart ICE.");
-        // This is the modern, correct way to restart a connection.
-        // It triggers a negotiationneeded event which you can handle if needed,
-        // but often the libraries handle the re-negotiation automatically.
-        if (peerConnection.signalingState === 'stable') {
-          peerConnection.restartIce();
-        }
-    } else if (state === 'connected' || state === 'completed') {
-        updateStatus("", false); // Hide status overlay on success
+
+    switch (state) {
+      case "checking":
+        updateStatus("Establishing connection...", false);
+        break;
+      case "connected":
+        updateStatus("", false);
+        break;
+      case "disconnected":
+        console.log("Connection lost, attempting reconnection...");
+        // Try immediate reconnection
+        peerConnection.restartIce();
+        break;
+      case "failed":
+        // Wait a bit before trying one last time
+        setTimeout(() => {
+          if (peerConnection.iceConnectionState === "failed") {
+            createOfferWithIceRestart()
+              .then(offer => {
+                peerConnection.setLocalDescription(offer);
+                ws.send(JSON.stringify({ type: "offer", offer: offer }));
+            })
+              .catch(() => {
+                showNotification("Connection failed. Finding new partner...");
+                resetConnection();
+            });
+          }
+        }, 3000);
+        break;
     }
-    // =======================================================================
   };
+
+  // Add connection quality monitoring
+  setInterval(() => {
+    if (peerConnection?.getStats) {
+      peerConnection.getStats().then(stats => {
+        stats.forEach(report => {
+          if (report.type === "candidate-pair" && report.state === "succeeded") {
+            console.log("Connection Quality:", 
+              report.availableOutgoingBitrate || 
+              report.availableIncomingBitrate);
+          }
+        });
+      });
+    }
+  }, 3000);
 
   peerConnection.onconnectionstatechange = () => {
     console.log(`Connection State: ${peerConnection.connectionState}`);
@@ -237,6 +264,7 @@ function configurePeerConnectionEventListeners() {
   peerConnection.ontrack = (event) => {
     if (remoteVideo.srcObject !== event.streams[0]) {
       remoteVideo.srcObject = event.streams[0];
+      updateStatus("", false);
       if (localStream) {
         sendMediaStatus("audio", localStream.getAudioTracks()[0]?.enabled);
         sendMediaStatus("video", localStream.getVideoTracks()[0]?.enabled);
@@ -257,22 +285,27 @@ async function ensureLocalMediaAndTracks() {
 }
 
 async function processQueuedIceCandidates() {
-  while (remoteIceCandidatesQueue.length > 0) {
-    const candidate = remoteIceCandidatesQueue.shift();
-    if (peerConnection.remoteDescription) {
-        try {
-            await peerConnection.addIceCandidate(candidate);
-        } catch (e) {
-            console.error('Error adding queued candidate:', e);
-        }
-    } else {
-      remoteIceCandidatesQueue.unshift(candidate);
-      break;
+  console.log(`Processing ${remoteIceCandidatesQueue.length} queued candidates`);
+  const candidates = [...remoteIceCandidatesQueue];
+  remoteIceCandidatesQueue = [];
+
+  for (const candidate of candidates) {
+    try {
+      if (peerConnection.remoteDescription) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        console.log('Added queued ICE candidate');
+      } else {
+        remoteIceCandidatesQueue.push(candidate);
+        console.log('Remote description not set, re-queuing candidate');
+        break;
+      }
+    } catch (e) {
+      console.error('Error adding queued candidate:', e);
     }
   }
 }
 
-function resetConnection(shouldReconnect = true) {
+function resetConnection() {
   if (peerConnection) {
     peerConnection.close();
     peerConnection = null;
@@ -282,8 +315,8 @@ function resetConnection(shouldReconnect = true) {
   setControlsEnabled(false);
   updateStatus("Searching for a new partner...");
   showControls();
-
-  if (shouldReconnect && ws.readyState === WebSocket.OPEN) {
+  // --- AUTO-CONNECT: After resetting, tell server we are ready again ---
+  if (ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type: "ready_for_peer" }));
   }
 }
@@ -312,46 +345,81 @@ function sendMediaStatus(kind, enabled) {
 
 // --- Button Event Listeners ---
 micBtn.addEventListener("click", () => {
+  const audioTrack = localStream?.getAudioTracks()[0];
   const audioSender = peerConnection
     ?.getSenders()
     .find((sender) => sender.track?.kind === "audio");
-  if (!audioSender?.track) return;
-  
-  const isEnabled = !audioSender.track.enabled;
+
+  if (!audioTrack || !audioSender?.track) {
+    console.warn("Audio track not found");
+    return;
+  }
+
+  // Toggle audio state for both local and remote tracks
+  const isEnabled = !audioTrack.enabled;
+  audioTrack.enabled = isEnabled;
   audioSender.track.enabled = isEnabled;
+
+  // Update button appearance
   micBtn.classList.toggle("active", isEnabled);
   micBtn.innerHTML = isEnabled
     ? '<i class="fa-solid fa-microphone"></i>'
     : '<i class="fa-solid fa-microphone-slash"></i>';
+
+  // Notify peer about audio state change
   sendMediaStatus("audio", isEnabled);
 });
 
 videoBtn.addEventListener("click", () => {
+  const videoTrack = localStream?.getVideoTracks()[0];
   const videoSender = peerConnection
     ?.getSenders()
     .find((sender) => sender.track?.kind === "video");
-  if (!videoSender?.track) return;
 
-  const isEnabled = !videoSender.track.enabled;
+  if (!videoTrack || !videoSender?.track) {
+    console.warn("Video track not found");
+    return;
+  }
+
+  // Toggle video state for both local and remote tracks
+  const isEnabled = !videoTrack.enabled;
+  videoTrack.enabled = isEnabled;
   videoSender.track.enabled = isEnabled;
+
+  // Update button appearance
   videoBtn.classList.toggle("active", isEnabled);
   videoBtn.innerHTML = isEnabled
     ? '<i class="fa-solid fa-video"></i>'
     : '<i class="fa-solid fa-video-slash"></i>';
+
+  // Keep video element visible but show black frame when disabled
+  localVideo.style.display = "block";
+  if (!isEnabled) {
+    localVideo.classList.add("video-off");
+  } else {
+    localVideo.classList.remove("video-off");
+  }
+
+  // Notify peer about video state change
   sendMediaStatus("video", isEnabled);
 });
 
 selfViewBtn.addEventListener("click", () => {
   const videoTrack = localStream?.getVideoTracks()[0];
-  if (videoTrack && !videoTrack.enabled) {
-    showNotification("Turn on your camera to see your self-view");
+  if (!videoTrack?.enabled) {
+    showNotification("Turn on your camera first");
     return;
   }
+
   localVideo.classList.toggle("hidden");
-  selfViewBtn.classList.toggle("active", !localVideo.classList.contains("hidden"));
-  selfViewBtn.innerHTML = localStream.getVideoTracks()[0]?.enabled && !localVideo.classList.contains("hidden")
-    ? '<i class="fa-solid fa-eye"></i>'
-    : '<i class="fa-solid fa-eye-slash"></i>';
+
+  selfViewBtn.classList.toggle(
+    "active",
+    !localVideo.classList.contains("hidden")
+  );
+  selfViewBtn.innerHTML = localVideo.classList.contains("hidden")
+    ? '<i class="fa-solid fa-eye-slash"></i>'
+    : '<i class="fa-solid fa-eye"></i>';
 });
 
 fullscreenBtn.addEventListener("click", () => {
@@ -375,32 +443,44 @@ confirmDisconnectOkBtn.addEventListener("click", () => {
 // --- Initial Page Load ---
 async function initialize() {
   try {
-    await fetchTurnConfig();
-    await startMedia();
+    // Fetch TURN config in parallel with media access
+    const [_, mediaResult] = await Promise.all([
+      fetchTurnConfig(),
+      startMedia()
+    ]);
     showControls();
   } catch (e) {
     console.error(`Initialization failed:`, e);
-    updateStatus(e.message);
-  }
-}
-
-// I am REMOVING this function entirely to prevent it from being used.
-// async function createOfferWithIceRestart() { ... }
-
-// Fetch TURN config once and cache it
-async function fetchTurnConfig() {
-  if (cachedTurnConfig) return cachedTurnConfig;
-  try {
-    const response = await fetch("/api/turn-config");
-    if (!response.ok) {
-        throw new Error(`Failed to fetch TURN config: ${response.statusText}`);
-    }
-    cachedTurnConfig = await response.json();
-    return cachedTurnConfig;
-  } catch (e) {
-    console.warn("Could not fetch TURN config:", e);
-    return {}; // Return empty object on failure
   }
 }
 
 initialize();
+
+// Add this function after the configurePeerConnectionEventListeners function
+async function createOfferWithIceRestart() {
+    try {
+        const offer = await peerConnection.createOffer({
+            iceRestart: true,
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true
+        });
+        return offer;
+    } catch (error) {
+        console.error('Error creating offer:', error);
+        throw error;
+    }
+}
+
+// Add this new function to fetch TURN config once
+async function fetchTurnConfig() {
+    if (cachedTurnConfig) return cachedTurnConfig;
+    
+    try {
+        const response = await fetch("/api/turn-config");
+        cachedTurnConfig = await response.json();
+        return cachedTurnConfig;
+    } catch (e) {
+        console.warn('Failed to fetch TURN config:', e);
+        return {};
+    }
+}
