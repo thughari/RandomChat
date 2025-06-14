@@ -185,11 +185,7 @@ async function ensurePeerConnection() {
           username: turnConfig.username,
           credential: turnConfig.credential
         }
-      ],
-      iceTransportPolicy: "all",
-      bundlePolicy: "max-bundle",
-      rtcpMuxPolicy: "require",
-      iceCandidatePoolSize: 2
+      ]
     });
 
     configurePeerConnectionEventListeners();
