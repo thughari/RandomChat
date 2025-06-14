@@ -103,7 +103,7 @@ ws.onmessage = async (message) => {
       setControlsEnabled(true);
       await ensurePeerConnection();
       await ensureLocalMediaAndTracks();
-      const offer = await peerConnection.createOffer();
+      const offer = await createOfferWithIceRestart();
       await peerConnection.setLocalDescription(offer);
       ws.send(JSON.stringify({ type: "offer", offer: offer }));
       break;
@@ -158,26 +158,79 @@ ws.onmessage = async (message) => {
 
 // --- WebRTC Core Functions ---
 async function ensurePeerConnection() {
-  if (peerConnection && peerConnection.signalingState !== "closed") return;
-  remoteIceCandidatesQueue = [];
-  const turnConfig = await fetch("/api/turn-config")
-    .then((res) => res.json())
-    .catch((e) => ({}));
-  peerConnection = new RTCPeerConnection({
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      ...(turnConfig.iceServers || []),
-    ],
-  });
-  configurePeerConnectionEventListeners();
+  try {
+    if (peerConnection && peerConnection.signalingState !== "closed") return;
+    
+    remoteIceCandidatesQueue = [];
+    const turnConfig = await fetch("/api/turn-config")
+      .then((res) => res.json())
+      .catch((e) => {
+        console.warn('Failed to fetch TURN config:', e);
+        return {};
+      });
+
+    peerConnection = new RTCPeerConnection({
+      iceServers: [
+        { 
+          urls: [
+            'stun:stun1.l.google.com:19302',
+            'stun:stun2.l.google.com:19302',
+            'stun:stun3.l.google.com:19302'
+          ]
+        },
+        ...(turnConfig.iceServers || [])
+      ],
+      iceTransportPolicy: "all",
+      bundlePolicy: "max-bundle",
+      rtcpMuxPolicy: "require",
+      iceCandidatePoolSize: 1
+    });
+
+    configurePeerConnectionEventListeners();
+  } catch (error) {
+    console.error('Error ensuring peer connection:', error);
+    throw error;
+  }
 }
 
 function configurePeerConnectionEventListeners() {
-  peerConnection.onicecandidate = (e) =>
-    e.candidate &&
-    ws.send(JSON.stringify({ type: "ice", candidate: e.candidate }));
-  peerConnection.oniceconnectionstatechange = () =>
+  peerConnection.onicecandidate = (e) => {
+    if (e.candidate) {
+      ws.send(JSON.stringify({ type: "ice", candidate: e.candidate }));
+    }
+  };
+
+  peerConnection.oniceconnectionstatechange = () => {
     console.log(`ICE State: ${peerConnection.iceConnectionState}`);
+
+    // Handle disconnections
+    if (
+      peerConnection.iceConnectionState === "disconnected" ||
+      peerConnection.iceConnectionState === "failed"
+    ) {
+      console.log("Connection lost, attempting reconnection...");
+
+      // Attempt reconnection
+      peerConnection.restartIce();
+
+      // If still failed after 5 seconds, reset
+      setTimeout(() => {
+        if (peerConnection.iceConnectionState === "failed") {
+          showNotification("Connection failed. Finding new partner...");
+          resetConnection();
+        }
+      }, 5000);
+    }
+  };
+
+  peerConnection.onconnectionstatechange = () => {
+    console.log(`Connection State: ${peerConnection.connectionState}`);
+  };
+
+  peerConnection.onicegatheringstatechange = () => {
+    console.log(`ICE Gathering State: ${peerConnection.iceGatheringState}`);
+  };
+
   peerConnection.ontrack = (event) => {
     if (remoteVideo.srcObject !== event.streams[0]) {
       remoteVideo.srcObject = event.streams[0];
@@ -359,3 +412,18 @@ async function initialize() {
 }
 
 initialize();
+
+// Add this function after the configurePeerConnectionEventListeners function
+async function createOfferWithIceRestart() {
+    try {
+        const offer = await peerConnection.createOffer({
+            iceRestart: true,
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true
+        });
+        return offer;
+    } catch (error) {
+        console.error('Error creating offer:', error);
+        throw error;
+    }
+}
