@@ -9,4 +9,6 @@ FROM openjdk:21-jdk-slim
 WORKDIR /app
 COPY --from=build /app/target/randomchat-0.0.1-SNAPSHOT.jar randomchat.jar
 EXPOSE 8082
-ENTRYPOINT ["java", "-jar", "randomchat.jar"]
+
+# stage 3: Run the application
+ENTRYPOINT ["java", "-Dspring.profiles.active=prod", "-jar", "randomchat.jar"]
