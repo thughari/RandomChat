@@ -29,7 +29,7 @@ Built with:
 
 ### Backend
 ```bash
-cd backend
+cd RandomChat
 ./mvnw spring-boot:run
 ````
 
