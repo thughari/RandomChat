@@ -2,18 +2,12 @@ name: CI for RandomChat
 
 # Trigger workflow on push/pull request to main branch and manually
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch to build'
+        description: 'Branch to deploy'
         required: true
-        default: 'dev'
+        default: 'main'
 
 jobs:
   build:
