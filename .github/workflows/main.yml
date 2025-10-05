@@ -1,6 +1,6 @@
-name: CI for Spring Boot Microservice
+name: CI for RandomChat
 
-# Trigger workflow on push or pull request to main branch
+# Trigger workflow on push/pull request to main branch and manually
 on:
   push:
     branches:
@@ -8,15 +8,23 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build'
+        required: true
+        default: 'dev'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       # Step 1: Checkout code
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          # Checkout the branch from input or default
+          ref: ${{ github.event.inputs.branch || github.ref }}
 
       # Step 2: Set up Java (match your Spring Boot version)
       - name: Set up Java 21
