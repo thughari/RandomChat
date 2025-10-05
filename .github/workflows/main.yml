@@ -19,11 +19,11 @@ jobs:
         uses: actions/checkout@v3
 
       # Step 2: Set up Java (match your Spring Boot version)
-      - name: Set up Java 17
+      - name: Set up Java 21
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       # Step 3: Cache Maven dependencies (optional, speeds up builds)
       - name: Cache Maven packages
