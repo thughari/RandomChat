@@ -46,10 +46,25 @@ jobs:
       - name: Build with Maven
         run: mvn clean package -DskipTests
 
-      # Step 5: (Optional) Run tests
+      # Step 5: Run tests
       - name: Run tests
         run: mvn test
 
-      # Step 6: (Optional) List the generated jar
+      # Step 6: List the generated jar
       - name: List target directory
         run: ls -l target/
+        
+      # Step 7 Trigger deployment via webhook
+      - name: Trigger deployment via webhook
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          echo "Triggering deployment..."
+          curl -X POST "$DEPLOY_HOOK_URL"
+          echo "Deployment triggered via webhook."
+
+      # Step 8: Wait a few seconds for deployment to register
+      - name: Wait for deployment to start
+        run: |
+          sleep 10
+          echo "Deployment started! wait for 5 min and try opening https://randomchat-hfta.onrender.com"
