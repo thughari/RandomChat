@@ -1,15 +1,47 @@
-name: My Deploy
+name: CI for Spring Boot Microservice
 
+# Trigger workflow on push or pull request to main branch
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Deploy to production
-        uses: johnbeynon/render-deploy-action@v0.0.8
+      # Step 1: Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Java (match your Spring Boot version)
+      - name: Set up Java 17
+        uses: actions/setup-java@v3
         with:
-          service-id: ${{ secrets.MY_RENDER_SERVICE_ID }}
-          api-key: ${{ secrets.MY_RENDER_API_KEY }}
-          wait-for-success: true
+          distribution: 'temurin'
+          java-version: '17'
+
+      # Step 3: Cache Maven dependencies (optional, speeds up builds)
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      # Step 4: Build the Spring Boot project
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
+
+      # Step 5: (Optional) Run tests
+      - name: Run tests
+        run: mvn test
+
+      # Step 6: (Optional) List the generated jar
+      - name: List target directory
+        run: ls -l target/
