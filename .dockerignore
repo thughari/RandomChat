@@ -1,0 +1,41 @@
+# IDE and build system files
+.idea/
+.vscode/
+*.iml
+*.log
+*.tmp
+*.swp
+*.swo
+*.bak
+*.orig
+*.rej
+
+# Maven and Eclipse files
+.mvn/
+.settings/
+.classpath
+.project
+.factorypath
+target/
+**/target/
+**/.classpath
+**/.project
+**/.settings
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# OS/Editor junk
+.DS_Store
+Thumbs.db
+
+# Test sources
+src/test/
+**/src/test/
+
+# Docs and markdown
+README.md
+CONTRIBUTING.md
+HELP.md

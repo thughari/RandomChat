@@ -163,29 +163,11 @@ async function ensurePeerConnection() {
     if (peerConnection && peerConnection.signalingState !== "closed") return;
     
     remoteIceCandidatesQueue = [];
-    const turnConfig = await fetchTurnConfig();
+    const iceServersFromBackend = await fetchTurnConfig();
+    console.log(iceServersFromBackend);
 
     peerConnection = new RTCPeerConnection({
-      iceServers: [
-        { 
-          urls: 'stun:stun.l.google.com:19302' 
-        },
-        {
-          urls: "turn:global.turn.twilio.com:3478?transport=udp",
-          username: turnConfig.username,
-          credential: turnConfig.credential
-        },
-        {
-          urls: "turn:global.turn.twilio.com:3478?transport=tcp",
-          username: turnConfig.username,
-          credential: turnConfig.credential
-        },
-        {
-          urls: "turn:global.turn.twilio.com:443?transport=tcp",
-          username: turnConfig.username,
-          credential: turnConfig.credential
-        }
-      ]
+      iceServers: iceServersFromBackend
     });
 
     configurePeerConnectionEventListeners();
@@ -480,6 +462,6 @@ async function fetchTurnConfig() {
         return cachedTurnConfig;
     } catch (e) {
         console.warn('Failed to fetch TURN config:', e);
-        return {};
+        return [];
     }
 }
