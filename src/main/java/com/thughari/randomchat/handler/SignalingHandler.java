@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 
 @Component
 public class SignalingHandler extends TextWebSocketHandler {
+	
 	private static final Logger logger = LoggerFactory.getLogger(SignalingHandler.class);
 	private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
 	private final Queue<String> waitingUsers = new ConcurrentLinkedQueue<>();
