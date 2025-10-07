@@ -302,6 +302,20 @@ video {
   background-color: #000;
 }
 
+.top-left-btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 50;
+}
+
+.top-right-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 50;
+}
+
 @media (max-width: 768px) {
   #localVideo {
     bottom: 85px;
@@ -323,5 +337,14 @@ video {
   .modal-content {
     width: 95%;
     padding: 1.25rem;
+  }
+
+  .top-left-btn {
+    top: 10px;
+    left: 10px;
+  }
+  .top-right-btn {
+    top: 10px;
+    right: 10px;
   }
 }

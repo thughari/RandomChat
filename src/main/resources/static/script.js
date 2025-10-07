@@ -116,15 +116,24 @@ ws.onmessage = async (message) => {
       break;
     case "offer":
       setControlsEnabled(true);
-      await ensurePeerConnection();
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription(data.offer)
-      );
+
+      // If not in have-remote-offer, forcibly reset connection
+      if (!peerConnection || peerConnection.signalingState !== "have-remote-offer") {
+        if (peerConnection) peerConnection.close();
+        await ensurePeerConnection();
+        await ensureLocalMediaAndTracks();
+      }
+
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
       await processQueuedIceCandidates();
-      await ensureLocalMediaAndTracks();
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
-      ws.send(JSON.stringify({ type: "answer", answer: answer }));
+
+      if (peerConnection.signalingState === "have-remote-offer" || peerConnection.signalingState === "have-local-pranswer") {
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        ws.send(JSON.stringify({ type: "answer", answer: answer }));
+      } else {
+        console.warn("Skipping createAnswer: signalingState is", peerConnection.signalingState);
+      }
       break;
     case "answer":
       await peerConnection.setRemoteDescription(
@@ -164,7 +173,7 @@ async function ensurePeerConnection() {
     
     remoteIceCandidatesQueue = [];
     const iceServersFromBackend = await fetchTurnConfig();
-    console.log(iceServersFromBackend);
+    //console.log(iceServersFromBackend);
 
     peerConnection = new RTCPeerConnection({
       iceServers: iceServersFromBackend
@@ -465,3 +474,61 @@ async function fetchTurnConfig() {
         return [];
     }
 }
+
+const audioOutputBtn = document.getElementById("audio-output-btn");
+const audioOutputIcon = document.getElementById("audio-output-icon");
+
+let isAudioStopped = false;
+
+// Detect and set default output
+async function setDefaultAudioOutput() {
+  if (!navigator.mediaDevices?.enumerateDevices) return;
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const earphones = devices.find(
+      (d) =>
+        d.kind === "audiooutput" &&
+        (d.label.toLowerCase().includes("headphone") ||
+          d.label.toLowerCase().includes("bluetooth"))
+    );
+
+    if (typeof remoteVideo.setSinkId === "function") {
+      if (earphones) {
+        await remoteVideo.setSinkId(earphones.deviceId);
+        // console.log("Earphones detected - switched to earphones.");
+        showNotification("Earphones connected");
+        audioOutputIcon.className = "fa-solid fa-headphones";
+      } else {
+        await remoteVideo.setSinkId("");
+        // console.log("Defaul to speaker.");
+        showNotification("Using speaker");
+        audioOutputIcon.className = "fa-solid fa-volume-high";
+      }
+    }
+  } catch (err) {
+    console.warn("Audio device detection failed:", err);
+  }
+}
+
+// device connection changes
+if (navigator.mediaDevices?.addEventListener) {
+  navigator.mediaDevices.addEventListener("devicechange", setDefaultAudioOutput);
+}
+
+// stop/start button
+audioOutputBtn.addEventListener("click", () => {
+  if (isAudioStopped) {
+    remoteVideo.muted = false;
+    showNotification("Audio resumed 🔊");
+    audioOutputIcon.className = "fa-solid fa-volume-high";
+  } else {
+    remoteVideo.muted = true;
+    showNotification("Audio stopped 🔇");
+    audioOutputIcon.className = "fa-solid fa-volume-xmark";
+  }
+  isAudioStopped = !isAudioStopped;
+});
+
+// on load
+setDefaultAudioOutput();

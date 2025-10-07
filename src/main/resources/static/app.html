@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="shortcut icon" href="assets/spider.png?v=1" type="image/x-icon">
+  <link rel="shortcut icon" href="assets/spider.png?v=2" type="image/x-icon">
   <title>Random Video Chat</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css">
 
-  <link rel="stylesheet" href="style.css?v=1">
+  <link rel="stylesheet" href="style.css?v=2">
 
 </head>
 
@@ -20,6 +20,13 @@
 
   <div class="app-container" id="app-container">
     <div class="video-container" id="video-container">
+      <button id="fullscreen-btn" class="control-btn top-left-btn" title="Toggle Fullscreen">
+        <i class="fa-solid fa-expand"></i>
+      </button>
+      <button id="report-btn" class="control-btn report-btn top-right-btn" title="Report User" disabled>
+        <i class="fa-solid fa-flag"></i>
+      </button>
+
       <div id="status-overlay">
         <span id="status-text">Searching for a partner...</span>
       </div>
@@ -31,18 +38,22 @@
       <video id="localVideo" autoplay muted playsinline></video>
 
       <div class="controls" id="controls">
-        <button id="mic-btn" class="control-btn active" title="Mute/Unmute Mic" disabled><i
-            class="fa-solid fa-microphone"></i></button>
-        <button id="video-btn" class="control-btn active" title="Stop/Start Video" disabled><i
-            class="fa-solid fa-video"></i></button>
-        <button id="self-view-btn" class="control-btn active" title="Hide/Show Self View" disabled><i
-            class="fa-solid fa-eye"></i></button>
-        <button id="disconnect-btn" class="control-btn" title="Find New Partner" disabled><i
-            class="fa-solid fa-forward"></i></button>
-        <button id="fullscreen-btn" class="control-btn" title="Toggle Fullscreen"><i
-            class="fa-solid fa-expand"></i></button>
-        <button id="report-btn" class="control-btn report-btn" title="Report User" disabled><i
-            class="fa-solid fa-flag"></i></button>
+        <button id="mic-btn" class="control-btn active" title="Mute/Unmute Mic" disabled>
+          <i class="fa-solid fa-microphone"></i>
+        </button>
+        <button id="video-btn" class="control-btn active" title="Stop/Start Video" disabled>
+          <i class="fa-solid fa-video"></i>
+        </button>
+        <button id="self-view-btn" class="control-btn active" title="Hide/Show Self View" disabled>
+          <i class="fa-solid fa-eye"></i>
+        </button>
+        <button id="disconnect-btn" class="control-btn" title="Find New Partner" disabled>
+          <i class="fa-solid fa-forward"></i>
+        </button>
+        <button id="audio-output-btn" class="control-btn" title="Switch Audio Output">
+          <i id="audio-output-icon" class="fa-solid fa-volume-high"></i>
+        </button>
+
       </div>
     </div>
   </div>
@@ -59,7 +70,7 @@
     </div>
   </div>
 
-  <script src="script.js?v=1"></script>
+  <script src="script.js?v=2"></script>
 
 </body>
 
