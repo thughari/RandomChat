@@ -254,6 +254,14 @@ footer .credit .fa-heart {
     color: var(--primary-color);
 }
 
+.highlight-link {
+  color: #03dac6;
+  font-weight: bold;
+  text-decoration: none;
+  border-bottom: 2px solid #03dac6;
+  transition: color 0.3s ease, border-bottom 0.3s ease;
+}
+
 #user-count {
     font-weight: bold;
 }
