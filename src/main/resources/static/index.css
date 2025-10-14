@@ -1,3 +1,5 @@
+
+
 :root {
     --primary-color: #03dac6;
     --primary-hover-color: #00c1ab;
@@ -148,29 +150,72 @@ header p {
 }
 
 footer {
-    text-align: center;
-    padding: 2rem 1rem;
-    font-size: 0.9rem;
-    background-color: var(--footer-background);
-    margin-top: auto;
-    line-height: 1.5;
+  background-color: var(--footer-background);
+  color: var(--text-color);
+  text-align: center;
+  padding: 2rem 1rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-top: auto;
 }
 
 footer a {
-    color: var(--primary-color);
-    text-decoration: none;
+  color: var(--primary-color);
+  text-decoration: none;
 }
 
 footer a:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
-footer .credit {
-    margin-top: 0.5rem;
+.footer-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-footer .credit .fa-heart {
-    color: var(--danger-color);
+/* TOP SECTION: Product Hunt + Social Icons */
+.footer-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding-bottom: 1rem;
+}
+
+.producthunt-badge img {
+  width: 230px;
+  height: auto;
+}
+
+/* SOCIAL ICONS */
+.social-links {
+  display: flex;
+  gap: 18px;
+}
+
+.social-links a {
+  font-size: 1.5rem;
+  color: var(--text-color);
+  transition: color 0.3s ease, transform 0.3s ease;
+}
+
+.social-links a:hover {
+  color: var(--primary-color);
+  transform: scale(1.15);
+}
+
+/* BOTTOM SECTION */
+.footer-bottom p {
+  margin: 0.3rem 0;
+}
+
+.credit .fa-heart {
+  color: var(--danger-color);
 }
 
 .modal-overlay {
@@ -315,4 +360,16 @@ footer .credit .fa-heart {
         padding: 2rem;
         max-height: none;
     }
+}
+
+@media (max-width: 768px) {
+  .footer-top {
+    flex-direction: column;
+    text-align: center;
+    border-bottom: none;
+  }
+
+  .social-links {
+    justify-content: center;
+  }
 }
