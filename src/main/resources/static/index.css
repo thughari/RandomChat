@@ -1,3 +1,5 @@
+
+
 :root {
     --primary-color: #03dac6;
     --primary-hover-color: #00c1ab;
@@ -314,5 +316,47 @@ footer .credit .fa-heart {
     .modal-content {
         padding: 2rem;
         max-height: none;
+    }
+}
+/*  SOCIAL ICONS + PRODUCT HUNT LAYOUT  */
+.footer-flex {
+    display: flex;
+    justify-content: space-between; /* Product Hunt left, socials right */
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 15px;
+    padding-top: 10px;
+    /*border-top: none;*/
+}
+
+.footer-flex .producthunt-badge img {
+    width: 250px;
+    height: 54px;
+}
+
+.social-links {
+    display: flex;
+    gap: 15px;
+}
+
+.social-links a {
+    color: var(--text-color);
+    font-size: 1.4rem;
+    transition: color 0.3s ease, transform 0.3s ease;
+}
+
+.social-links a:hover {
+    color: var(--primary-color);
+    transform: scale(1.2);
+}
+
+@media (max-width: 768px) {
+    .footer-flex {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .social-links {
+        justify-content: center;
     }
 }
