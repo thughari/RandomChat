@@ -5,7 +5,7 @@ COPY . .
 RUN mvn clean package -DskipTests
 
 # Stage 2: Run the JAR
-FROM openjdk:21-jdk-slim
+FROM amazoncorretto:21
 WORKDIR /app
 COPY --from=build /app/target/randomchat-0.0.1-SNAPSHOT.jar randomchat.jar
 EXPOSE 8082
