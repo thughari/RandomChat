@@ -23,7 +23,7 @@ body {
   width: 100%;
   overflow: hidden;
   font-family: 'Roboto', sans-serif;
-  background-color: var(--bg-color);
+  background-color: #000;
   color: var(--text-color);
 }
 
