@@ -161,7 +161,6 @@ footer {
   font-size: 0.9rem;
   line-height: 1.6;
   margin-top: auto;
-  padding-bottom: calc(2rem + env(safe-area-inset-bottom)); 
 }
 
 footer a {
