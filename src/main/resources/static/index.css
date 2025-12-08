@@ -1,4 +1,7 @@
-
+html {
+    background-color: #0f2027; 
+    overscroll-behavior-y: none; 
+}
 
 :root {
     --primary-color: #03dac6;
@@ -26,7 +29,7 @@ body {
     color: var(--text-color);
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    min-height: 100dvh;
 }
 
 main {
