@@ -29,6 +29,7 @@ body {
     color: var(--text-color);
     display: flex;
     flex-direction: column;
+    min-height: 100vh;
     min-height: 100dvh;
 }
 
@@ -160,6 +161,7 @@ footer {
   font-size: 0.9rem;
   line-height: 1.6;
   margin-top: auto;
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom)); 
 }
 
 footer a {
